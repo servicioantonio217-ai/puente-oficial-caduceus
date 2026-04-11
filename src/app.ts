@@ -170,6 +170,10 @@ export class App {
           <small style="color: #666;">Your Hermes Agent API endpoint</small>
         </div>
         <div class="field">
+          <label>Hermes API Key (optional):</label>
+          <input id="onb-hermes-key" type="password" placeholder="Leave empty if not required">
+        </div>
+        <div class="field">
           <label>STT Endpoint:</label>
           <input id="onb-stt-url" type="text" placeholder="http://your-server:4000">
           <small style="color: #666;">Whisper-compatible Speech-to-Text API</small>
@@ -212,6 +216,7 @@ export class App {
 
     document.getElementById('btn-onb-save')!.onclick = () => {
       const hermesUrl = (document.getElementById('onb-hermes') as HTMLInputElement).value.trim()
+      const hermesApiKey = (document.getElementById('onb-hermes-key') as HTMLInputElement).value.trim()
       const sttUrl = (document.getElementById('onb-stt-url') as HTMLInputElement).value.trim()
       const sttKey = (document.getElementById('onb-stt-key') as HTMLInputElement).value.trim()
       const sttModel = (document.getElementById('onb-stt-model') as HTMLInputElement).value.trim()
@@ -226,6 +231,7 @@ export class App {
       }
 
       this.config.hermesUrl = hermesUrl
+      this.config.hermesApiKey = hermesApiKey
       this.config.stt.apiUrl = sttUrl
       this.config.stt.apiKey = sttKey
       this.config.stt.model = sttModel || 'whisper-1'
@@ -433,7 +439,7 @@ export class App {
           log(`Hermes error: ${msg}`)
         }
       }
-    }))
+    })
 
     // Reset config — go back to onboarding
     document.getElementById('btn-reset')!.onclick = () => {
@@ -489,7 +495,7 @@ export class App {
         new TextContainerProperty({
           xPosition: 0, yPosition: 40, width: 576, height: 48,
           containerID: 1, containerName: 'title',
-          content: '  > CADEUCEUS',
+          content: '  > CADUCEUS',
           isEventCapture: 0,
         }),
         new TextContainerProperty({
@@ -564,7 +570,7 @@ export class App {
       textObject: [
         new TextContainerProperty({
           xPosition: 0, yPosition: 40, width: 576, height: 48,
-          containerID: 1, containerName: 'title', content: '  > CADEUCEUS',
+          containerID: 1, containerName: 'title', content: '  > CADUCEUS',
           isEventCapture: 0,
         }),
         new TextContainerProperty({

@@ -9,7 +9,7 @@ import { pcmToWav } from './pcm-to-wav'
  */
 
 export interface SttConfig {
-  /** LiteLLM proxy base URL */
+  /** Whisper-compatible API base URL */
   apiUrl: string
   /** API key for authentication */
   apiKey: string
@@ -28,7 +28,7 @@ export interface SttResult {
 }
 
 const DEFAULT_CONFIG: SttConfig = {
-  apiUrl: 'http://10.2.0.12:4000',
+  apiUrl: '',
   apiKey: '',
   model: 'whisper-1',
   language: null,
@@ -86,7 +86,7 @@ export async function transcribe(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15_000) // 15s timeout for STT
 
-  let response: Response
+  let response: Response | undefined
   let lastErr: Error | undefined
   for (let attempt = 0; attempt <= 1; attempt++) {
     try {
