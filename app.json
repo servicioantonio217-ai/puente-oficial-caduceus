@@ -1,0 +1,8 @@
+{
+  "name": "G2 Caduceus",
+  "description": "Voice-first AI assistant - Hermes Agent on your G2",
+  "version": "0.1.0",
+  "author": "Qu4ndo",
+  "entry": "index.html",
+  "permissions": ["audio"]
+}

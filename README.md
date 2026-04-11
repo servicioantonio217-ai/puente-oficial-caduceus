@@ -1,93 +1,92 @@
 # G2 Caduceus
 
+Voice-first integration of the [Even Realities G2](https://www.evenrealities.com/smart-glasses) smart glasses with [Hermes Agent](https://gitlab.pfandl.cloud/services/hermes-agent) for hands-free communication and control of the AI assistant via audio input and display overlay.
 
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Architecture
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.pfandl.cloud/coding-agent/g2-caduceus.git
-git branch -M main
-git push -uf origin main
+┌──────────────┐ Bluetooth ┌──────────────────┐ HTTPS ┌──────────────┐
+│  G2 Glasses  │ ◄────────► │ Phone (WebView)  │ ◄────► │ Hermes Agent │
+│ (display +   │           │ (Caduceus app)   │       │   (API)      │
+│  mic input)  │           │                  │       └──────────────┘
+└──────────────┘           └──────────────────┘
 ```
 
-## Integrate with your tools
+- **Audio In**: Glasses 4-mic array captures PCM 16kHz → STT → Hermes prompt
+- **Display Out**: Hermes response → paginated text → glasses display (576×288px, 4-bit greyscale)
+- **Input**: Touchpad press (toggle recording), double-press (quit), swipe (scroll pages)
 
-* [Set up project integrations](https://gitlab.pfandl.cloud/coding-agent/g2-caduceus/-/settings/integrations)
+## Development
 
-## Collaborate with your team
+### Prerequisites
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+- Node.js 18+
+- npm 9+
+- [Even Hub CLI](https://hub.evenrealities.com/docs/reference/cli)
+- Even Realities App on your phone + G2 glasses paired
 
-## Test and Deploy
+### Setup
 
-Use the built-in continuous integration in GitLab.
+```bash
+npm install
+npm run dev
+```
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### QR Sideload
 
-***
+```bash
+# Generate QR code for sideloading (replace IP with your local LAN IP)
+npx evenhub qr --url "http://192.168.x.x:5173"
 
-# Editing this README
+# Or auto-detect:
+npx evenhub qr -i $(hostname -I | awk '{print $1}') -p 5173
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Scan the QR code with the Even Realities App to load Caduceus directly with hot reload.
 
-## Suggestions for a good README
+### Simulator (no hardware needed)
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+The app includes a browser fallback that shows a debug UI when the Even Hub bridge is not detected. Just open `http://localhost:5173` in any browser.
 
-## Name
-Choose a self-explaining name for your project.
+### Build
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```bash
+npm run build
+npm run preview  # Serve production build locally
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## Project Structure
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```
+src/
+├── main.ts      # Entry point
+├── app.ts       # Main Caduceus app logic (bridge, events, Hermes API)
+├── style.css    # Minimal styles (browser fallback only)
+└── vite-env.d.ts
+app.json         # Even Hub manifest
+vite.config.ts   # Vite config (network exposure for sideloading)
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## Current Status
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+- [x] Project scaffolding (Vite + TypeScript + Even Hub SDK)
+- [x] Bridge initialization and event handling
+- [x] Display containers (welcome, status, pagination)
+- [x] Touch input (press, double-press, scroll)
+- [x] Audio capture (PCM from glasses mic)
+- [ ] Speech-to-Text integration (STT)
+- [ ] Hermes API integration (production endpoint + auth)
+- [ ] Settings screen (Hermes URL, API key)
+- [ ] Simulator testing
+- [ ] QR sideload testing on real hardware
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## SDK Reference
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+- [Even Hub Docs](https://hub.evenrealities.com/docs)
+- [SDK npm](https://www.npmjs.com/package/@evenrealities/even_hub_sdk)
+- [CLI npm](https://www.npmjs.com/package/@evenrealities/evenhub-cli)
+- [Simulator npm](https://www.npmjs.com/package/@evenrealities/evenhub-simulator)
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Private — Qu4ndo
