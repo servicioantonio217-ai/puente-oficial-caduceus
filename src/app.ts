@@ -252,7 +252,7 @@ export class App {
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 12px;">
-          <label style="display:block; margin-bottom: 4px;">LiteLLM URL:</label>
+          <label style="display:block; margin-bottom: 4px;">STT Endpoint:</label>
           <input id="cfg-stt-url" type="text" value=""
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
@@ -262,7 +262,7 @@ export class App {
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 16px;">
-          <label style="display:block; margin-bottom: 4px;">API Key (optional):</label>
+          <label style="display:block; margin-bottom: 4px;">STT API Key (optional):</label>
           <input id="cfg-stt-key" type="password" value=""
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
@@ -376,7 +376,6 @@ export class App {
       }
     }
   }
-
   /**
    * Set up Even Hub event listeners for touch input and audio.
    * Only called when bridge is available — glasses run independently of WebUI.
