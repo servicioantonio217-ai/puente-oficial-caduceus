@@ -1,5 +1,6 @@
-/* G2 Caduceus — minimal styles for browser fallback only */
-/* On the glasses, display is controlled via SDK containers, not CSS */
+/* G2 Caduceus — companion WebUI styles */
+/* Always visible on phone (Even Hub WebView) or browser */
+/* Glasses display is controlled via SDK containers, not CSS */
 
 :root {
   font-family: monospace;

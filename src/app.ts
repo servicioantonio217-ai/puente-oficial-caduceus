@@ -61,19 +61,22 @@ function friendlyError(err: unknown): string {
 /**
  * G2 Caduceus — Hermes Agent integration for Even Realities G2 smart glasses.
  *
- * Flow:
- *   1. Initialize Even Hub bridge
- *   2. Display welcome screen on glasses
- *   3. Press = start recording, Press again = stop + send
- *   4. Capture audio via glasses microphone (PCM 16kHz)
- *   5. Convert PCM → WAV, transcribe via Whisper (LiteLLM proxy)
- *   6. Send transcript to Hermes API
- *   7. Display response on glasses (paginated)
- *   8. Swipe up/down to scroll through pages
- *   9. Double-press to quit
+ * Architecture:
+ *   - WebUI is always rendered (phone or browser) as a companion interface
+ *   - Glasses display runs independently via Even Hub bridge (when available)
+ *   - Config changes via WebUI take effect immediately for both interfaces
+ *
+ * Glasses flow:
+ *   1. Press = start recording, Press again = stop + send
+ *   2. Capture audio via glasses microphone (PCM 16kHz)
+ *   3. Convert PCM → WAV, transcribe via Whisper (LiteLLM proxy)
+ *   4. Send transcript to Hermes API
+ *   5. Display response on glasses (paginated)
+ *   6. Swipe up/down to scroll through pages
+ *   7. Double-press to quit
  */
 
-/** Configuration — can be loaded from localStorage in the future */
+/** Configuration — persisted in localStorage, editable via WebUI */
 interface CaduceusConfig {
   hermesUrl: string
   stt: SttConfig
@@ -92,6 +95,7 @@ const DEFAULT_CONFIG: CaduceusConfig = {
 
 export class App {
   private bridge!: EvenAppBridge
+  private hasBridge = false
   private config = DEFAULT_CONFIG
   private isRecording = false
   private audioChunks: Uint8Array[] = []
@@ -101,21 +105,26 @@ export class App {
   async init(): Promise<void> {
     console.log('[Caduceus] Initializing...')
 
-    // Try loading config from localStorage
+    // Always load config first
     this.loadConfig()
 
+    // Always render WebUI (companion interface — phone or browser)
+    this.initWebUI()
+
+    // Try connecting to glasses bridge (runs independently of WebUI)
     try {
       this.bridge = await waitForEvenAppBridge()
+      this.hasBridge = true
       console.log('[Caduceus] Bridge ready')
-    } catch {
-      console.warn('[Caduceus] Bridge not available — running in browser mode')
-      this.initBrowserFallback()
-      return
-    }
+      this.updateBridgeStatus(true)
 
-    this.setupEventListeners()
-    await this.showWelcome()
-    console.log('[Caduceus] Ready — press to speak')
+      this.setupEventListeners()
+      await this.showWelcome()
+      console.log('[Caduceus] Ready — press to speak')
+    } catch {
+      console.warn('[Caduceus] Bridge not available — glasses mode disabled')
+      this.updateBridgeStatus(false)
+    }
   }
 
   private loadConfig(): void {
@@ -139,33 +148,35 @@ export class App {
   }
 
   /**
-   * Browser fallback for development without glasses.
+   * WebUI — always rendered as companion interface.
+   * Shows settings, status, mic test, and debug log.
+   * Works on phone (Even Hub WebView) and in regular browsers.
    */
-  private initBrowserFallback(): void {
+  private initWebUI(): void {
     const app = document.getElementById('app')!
     app.innerHTML = `
       <div style="padding: 20px; font-family: monospace; max-width: 576px; margin: 0 auto;">
-        <h2>Caduceus — Browser Mode</h2>
-        <p>Even Hub bridge not detected. This is the development fallback.</p>
+        <h2>Caduceus</h2>
+        <p id="bridge-status" style="color: #666;">Checking glasses connection...</p>
         <hr style="margin: 16px 0;">
         <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">Hermes URL:</label>
-          <input id="cfg-hermes" type="text" value="" 
+          <input id="cfg-hermes" type="text" value=""
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">LiteLLM URL:</label>
-          <input id="cfg-stt-url" type="text" value="" 
+          <input id="cfg-stt-url" type="text" value=""
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">STT Model:</label>
-          <input id="cfg-stt-model" type="text" value="" 
+          <input id="cfg-stt-model" type="text" value=""
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 16px;">
           <label style="display:block; margin-bottom: 4px;">API Key (optional):</label>
-          <input id="cfg-stt-key" type="password" value="" 
+          <input id="cfg-stt-key" type="password" value=""
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <button id="btn-save" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Save Config</button>
@@ -187,7 +198,7 @@ export class App {
       debug.textContent += `[${ts}] ${msg}\n`
       debug.scrollTop = debug.scrollHeight
     }
-    log('Browser mode active')
+    log('Caduceus started')
 
     // Save config
     document.getElementById('btn-save')!.onclick = () => {
@@ -269,7 +280,19 @@ export class App {
   }
 
   /**
+   * Update the bridge status indicator in the WebUI.
+   */
+  private updateBridgeStatus(connected: boolean): void {
+    const el = document.getElementById('bridge-status')
+    if (el) {
+      el.textContent = connected ? 'Glasses: connected' : 'Glasses: not connected (browser mode)'
+      el.style.color = connected ? '#0f0' : '#f80'
+    }
+  }
+
+  /**
    * Set up Even Hub event listeners for touch input and audio.
+   * Only called when bridge is available — glasses run independently of WebUI.
    */
   private setupEventListeners(): void {
     this.bridge.onEvenHubEvent(async (event) => {
@@ -379,6 +402,8 @@ export class App {
    * Update the status text container on the glasses.
    */
   private async updateStatus(text: string): Promise<void> {
+    if (!this.hasBridge) return
+
     const rebuild = new RebuildPageContainer({
       containerTotalNum: 3,
       textObject: [
@@ -437,7 +462,7 @@ export class App {
       await this.updateStatus(`"${sttResult.text.slice(0, 80)}"`)
       const response = await this.sendToHermes(sttResult.text)
 
-      // Step 3: Display response
+      // Step 3: Display response on glasses
       this.displayResponse(response)
     } catch (err) {
       console.error('[Caduceus] Error:', err)
