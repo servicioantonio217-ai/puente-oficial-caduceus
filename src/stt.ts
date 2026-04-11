@@ -83,11 +83,37 @@ export async function transcribe(
 
   console.log(`[STT] Sending ${wavBuffer.byteLength} bytes WAV to ${url}`)
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: formData,
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000) // 15s timeout for STT
+
+  let response: Response
+  let lastErr: Error | undefined
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      })
+      // Retry on 5xx
+      if (response.status >= 500 && attempt === 0) {
+        await new Promise(r => setTimeout(r, 1000))
+        continue
+      }
+      break
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err))
+      if (lastErr.name === 'AbortError') {
+        clearTimeout(timeout)
+        throw new Error('STT request timed out (15s)')
+      }
+      if (attempt === 0) await new Promise(r => setTimeout(r, 1000))
+    }
+  }
+  clearTimeout(timeout)
+
+  if (!response) throw lastErr ?? new Error('STT request failed after retry')
 
   if (!response.ok) {
     const errorText = await response.text()

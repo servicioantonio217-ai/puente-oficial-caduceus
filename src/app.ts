@@ -9,6 +9,56 @@ import {
 import { transcribe, type SttConfig } from './stt'
 
 /**
+ * Fetch with automatic retry and exponential backoff for transient errors.
+ *
+ * Retries on network failures and 5xx server errors.
+ * Does NOT retry on 4xx client errors (those are not transient).
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit & { retryMax?: number; retryBaseMs?: number },
+): Promise<Response> {
+  const { retryMax = 2, retryBaseMs = 1000, ...fetchOpts } = options
+
+  let lastError: Error | undefined
+  for (let attempt = 0; attempt <= retryMax; attempt++) {
+    try {
+      const response = await fetch(url, fetchOpts)
+
+      // Retry on 5xx server errors (not on 4xx client errors)
+      if (response.status >= 500 && attempt < retryMax) {
+        const delay = retryBaseMs * Math.pow(2, attempt)
+        console.warn(`[fetchWithRetry] Server error ${response.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${retryMax})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+
+      return response
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      // Don't retry on abort (timeout) — those are intentional
+      if (lastError.name === 'AbortError') throw lastError
+      if (attempt < retryMax) {
+        const delay = retryBaseMs * Math.pow(2, attempt)
+        console.warn(`[fetchWithRetry] Network error, retrying in ${delay}ms (attempt ${attempt + 1}/${retryMax}):`, lastError.message)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  throw lastError ?? new Error('fetchWithRetry: all retries exhausted')
+}
+
+/** Map raw errors to user-friendly messages for the glasses display */
+function friendlyError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (msg.includes('timed out')) return 'Request timed out\nCheck connection'
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return 'Network error\nCheck connection'
+  if (msg.includes('STT API error')) return 'Speech service\nunavailable'
+  if (msg.includes('Hermes')) return 'Hermes service\nunavailable'
+  return 'Error occurred\nTry again'
+}
+
+/**
  * G2 Caduceus — Hermes Agent integration for Even Realities G2 smart glasses.
  *
  * Flow:
@@ -100,22 +150,22 @@ export class App {
         <hr style="margin: 16px 0;">
         <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">Hermes URL:</label>
-          <input id="cfg-hermes" type="text" value="${this.config.hermesUrl}" 
+          <input id="cfg-hermes" type="text" value="" 
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">LiteLLM URL:</label>
-          <input id="cfg-stt-url" type="text" value="${this.config.stt.apiUrl}" 
+          <input id="cfg-stt-url" type="text" value="" 
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">STT Model:</label>
-          <input id="cfg-stt-model" type="text" value="${this.config.stt.model}" 
+          <input id="cfg-stt-model" type="text" value="" 
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 16px;">
           <label style="display:block; margin-bottom: 4px;">API Key (optional):</label>
-          <input id="cfg-stt-key" type="password" value="${this.config.stt.apiKey}" 
+          <input id="cfg-stt-key" type="password" value="" 
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <button id="btn-save" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Save Config</button>
@@ -124,6 +174,12 @@ export class App {
         <pre id="debug-output" style="margin-top: 16px; padding: 12px; background: #111; color: #0f0; font-size: 12px; max-height: 400px; overflow: auto; white-space: pre-wrap;"></pre>
       </div>
     `
+    // Set config values via DOM API to prevent XSS from template literal injection
+    const setVal = (id: string, val: string) => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = val }
+    setVal('cfg-hermes', this.config.hermesUrl)
+    setVal('cfg-stt-url', this.config.stt.apiUrl)
+    setVal('cfg-stt-model', this.config.stt.model)
+    setVal('cfg-stt-key', this.config.stt.apiKey)
     const debug = document.getElementById('debug-output')!
 
     const log = (msg: string) => {
@@ -255,7 +311,7 @@ export class App {
         new TextContainerProperty({
           xPosition: 0, yPosition: 40, width: 576, height: 48,
           containerID: 1, containerName: 'title',
-          content: '  > CADETCEUS',
+          content: '  > CADEUCEUS',
           isEventCapture: 0,
         }),
         new TextContainerProperty({
@@ -328,7 +384,7 @@ export class App {
       textObject: [
         new TextContainerProperty({
           xPosition: 0, yPosition: 40, width: 576, height: 48,
-          containerID: 1, containerName: 'title', content: '  > CADETCEUS',
+          containerID: 1, containerName: 'title', content: '  > CADEUCEUS',
           isEventCapture: 0,
         }),
         new TextContainerProperty({
@@ -385,7 +441,7 @@ export class App {
       this.displayResponse(response)
     } catch (err) {
       console.error('[Caduceus] Error:', err)
-      await this.updateStatus(`Error:\n${String(err).slice(0, 200)}`)
+      await this.updateStatus(`Error:\n${friendlyError(err)}`)
     }
   }
 
@@ -395,7 +451,10 @@ export class App {
   private async sendToHermes(prompt: string): Promise<string> {
     console.log('[Caduceus] Sending to Hermes:', prompt)
 
-    const response = await fetch(`${this.config.hermesUrl}/v1/chat/completions`, {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30_000) // 30s timeout for Hermes
+
+    const response = await fetchWithRetry(`${this.config.hermesUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -403,13 +462,17 @@ export class App {
         messages: [
           {
             role: 'system',
-            content: 'You are Hermes, a concise AI assistant displayed on smart glasses. Keep responses under 500 characters. Use short sentences. No markdown formatting.',
+            content: 'You are Hermes, a concise AI assistant displayed on smart glasses (576x288px, 4-bit greyscale, monospace). Keep responses under 400 characters. Use short sentences. No markdown. ASCII only. Max ~50 chars per line for readability. Separate paragraphs with blank lines for pagination.',
           },
           { role: 'user', content: prompt },
         ],
         max_tokens: 200,
       }),
+      signal: controller.signal,
+      retryMax: 2,
+      retryBaseMs: 1000,
     })
+    clearTimeout(timeout)
 
     if (!response.ok) {
       throw new Error(`Hermes ${response.status}: ${await response.text()}`)
