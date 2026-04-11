@@ -6,6 +6,7 @@ import {
   RebuildPageContainer,
   OsEventTypeList,
 } from '@evenrealities/even_hub_sdk'
+import { transcribe, type SttConfig } from './stt'
 
 /**
  * G2 Caduceus — Hermes Agent integration for Even Realities G2 smart glasses.
@@ -13,29 +14,51 @@ import {
  * Flow:
  *   1. Initialize Even Hub bridge
  *   2. Display welcome screen on glasses
- *   3. Wait for touch input (press = start recording, double-press = quit)
- *   4. Capture audio via glasses microphone
- *   5. Send to Hermes API for processing
- *   6. Display response on glasses (paginated)
- *   7. Scroll through pages with swipe up/down
+ *   3. Press = start recording, Press again = stop + send
+ *   4. Capture audio via glasses microphone (PCM 16kHz)
+ *   5. Convert PCM → WAV, transcribe via Whisper (LiteLLM proxy)
+ *   6. Send transcript to Hermes API
+ *   7. Display response on glasses (paginated)
+ *   8. Swipe up/down to scroll through pages
+ *   9. Double-press to quit
  */
+
+/** Configuration — can be loaded from localStorage in the future */
+interface CaduceusConfig {
+  hermesUrl: string
+  stt: SttConfig
+}
+
+const DEFAULT_CONFIG: CaduceusConfig = {
+  hermesUrl: 'http://10.2.1.15:3000',
+  stt: {
+    apiUrl: 'http://10.2.0.12:4000',
+    apiKey: '',
+    model: 'whisper-1',
+    language: null,
+    responseFormat: 'json',
+  },
+}
 
 export class App {
   private bridge!: EvenAppBridge
+  private config = DEFAULT_CONFIG
   private isRecording = false
   private audioChunks: Uint8Array[] = []
   private currentPage = 0
   private pages: string[] = []
-  private hermesUrl = 'http://10.2.1.15:3000' // Hermes API endpoint — configure via settings
 
   async init(): Promise<void> {
     console.log('[Caduceus] Initializing...')
 
+    // Try loading config from localStorage
+    this.loadConfig()
+
     try {
       this.bridge = await waitForEvenAppBridge()
       console.log('[Caduceus] Bridge ready')
-    } catch (err) {
-      console.error('[Caduceus] Bridge not available — running in browser mode')
+    } catch {
+      console.warn('[Caduceus] Bridge not available — running in browser mode')
       this.initBrowserFallback()
       return
     }
@@ -45,9 +68,28 @@ export class App {
     console.log('[Caduceus] Ready — press to speak')
   }
 
+  private loadConfig(): void {
+    try {
+      const stored = localStorage.getItem('caduceus_config')
+      if (stored) {
+        this.config = { ...DEFAULT_CONFIG, ...JSON.parse(stored) }
+        console.log('[Caduceus] Config loaded from localStorage')
+      }
+    } catch {
+      // Ignore parse errors, use defaults
+    }
+  }
+
+  private saveConfig(): void {
+    try {
+      localStorage.setItem('caduceus_config', JSON.stringify(this.config))
+    } catch {
+      // Ignore quota errors
+    }
+  }
+
   /**
    * Browser fallback for development without glasses.
-   * Shows a minimal debug UI.
    */
   private initBrowserFallback(): void {
     const app = document.getElementById('app')!
@@ -55,39 +97,118 @@ export class App {
       <div style="padding: 20px; font-family: monospace; max-width: 576px; margin: 0 auto;">
         <h2>Caduceus — Browser Mode</h2>
         <p>Even Hub bridge not detected. This is the development fallback.</p>
-        <p>Open this page on the Even Realities App (QR sideload) for full functionality.</p>
         <hr style="margin: 16px 0;">
-        <button id="btn-record" style="padding: 12px 24px; font-size: 16px; cursor: pointer;">
-          🎤 Start Recording
-        </button>
-        <button id="btn-stop" style="padding: 12px 24px; font-size: 16px; cursor: pointer; margin-left: 8px;" disabled>
-          ⏹ Stop
-        </button>
-        <pre id="debug-output" style="margin-top: 16px; padding: 12px; background: #111; color: #0f0; font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap;"></pre>
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; margin-bottom: 4px;">Hermes URL:</label>
+          <input id="cfg-hermes" type="text" value="${this.config.hermesUrl}" 
+                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; margin-bottom: 4px;">LiteLLM URL:</label>
+          <input id="cfg-stt-url" type="text" value="${this.config.stt.apiUrl}" 
+                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; margin-bottom: 4px;">STT Model:</label>
+          <input id="cfg-stt-model" type="text" value="${this.config.stt.model}" 
+                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display:block; margin-bottom: 4px;">API Key (optional):</label>
+          <input id="cfg-stt-key" type="password" value="${this.config.stt.apiKey}" 
+                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        </div>
+        <button id="btn-save" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Save Config</button>
+        <button id="btn-record" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Mic Test (STT)</button>
+        <button id="btn-hermes" style="padding: 8px 16px; cursor: pointer;">Test Hermes</button>
+        <pre id="debug-output" style="margin-top: 16px; padding: 12px; background: #111; color: #0f0; font-size: 12px; max-height: 400px; overflow: auto; white-space: pre-wrap;"></pre>
       </div>
     `
     const debug = document.getElementById('debug-output')!
-    const btnRecord = document.getElementById('btn-record') as HTMLButtonElement
-    const btnStop = document.getElementById('btn-stop') as HTMLButtonElement
 
     const log = (msg: string) => {
-      debug.textContent += msg + '\n'
+      const ts = new Date().toLocaleTimeString()
+      debug.textContent += `[${ts}] ${msg}\n`
       debug.scrollTop = debug.scrollHeight
     }
-    log('[Caduceus] Browser mode active')
+    log('Browser mode active')
 
-    btnRecord.onclick = () => {
-      log('[Caduceus] Recording started (simulated)')
-      btnRecord.disabled = true
-      btnStop.disabled = false
+    // Save config
+    document.getElementById('btn-save')!.onclick = () => {
+      this.config.hermesUrl = (document.getElementById('cfg-hermes') as HTMLInputElement).value
+      this.config.stt.apiUrl = (document.getElementById('cfg-stt-url') as HTMLInputElement).value
+      this.config.stt.model = (document.getElementById('cfg-stt-model') as HTMLInputElement).value
+      this.config.stt.apiKey = (document.getElementById('cfg-stt-key') as HTMLInputElement).value
+      this.saveConfig()
+      log('Config saved')
     }
-    btnStop.onclick = () => {
-      log('[Caduceus] Recording stopped — sending to Hermes...')
-      btnRecord.disabled = false
-      btnStop.disabled = true
-      this.sendToHermes('Test prompt from browser mode')
-        .then(response => log(`[Caduceus] Response: ${response}`))
-        .catch(err => log(`[Caduceus] Error: ${err}`))
+
+    // STT test — uses browser MediaRecorder for real mic input
+    document.getElementById('btn-record')!.onclick = async () => {
+      log('Requesting microphone access...')
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { sampleRate: 16000, channelCount: 1 },
+        })
+
+        log('Recording 3 seconds of audio...')
+        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+        const chunks: Blob[] = []
+
+        recorder.ondataavailable = (e) => chunks.push(e.data)
+
+        recorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop())
+          const blob = new Blob(chunks, { type: 'audio/webm' })
+          log(`Recorded ${blob.size} bytes (webm)`)
+
+          // Send to Whisper via LiteLLM
+          const formData = new FormData()
+          formData.append('file', blob, 'recording.webm')
+          formData.append('model', this.config.stt.model)
+          formData.append('response_format', 'json')
+
+          const headers: Record<string, string> = {}
+          if (this.config.stt.apiKey) {
+            headers['Authorization'] = `Bearer ${this.config.stt.apiKey}`
+          }
+
+          log(`Sending to ${this.config.stt.apiUrl}/v1/audio/transcriptions ...`)
+          try {
+            const resp = await fetch(`${this.config.stt.apiUrl}/v1/audio/transcriptions`, {
+              method: 'POST',
+              headers,
+              body: formData,
+            })
+            if (!resp.ok) {
+              const err = await resp.text()
+              log(`STT error ${resp.status}: ${err}`)
+              return
+            }
+            const data = await resp.json()
+            log(`Transcription: "${data.text}"`)
+            if (data.language) log(`Detected language: ${data.language}`)
+          } catch (err) {
+            log(`STT fetch error: ${err}`)
+          }
+        }
+
+        recorder.start()
+        setTimeout(() => recorder.stop(), 3000)
+      } catch (err) {
+        log(`Mic error: ${err}`)
+      }
+    }
+
+    // Hermes test
+    document.getElementById('btn-hermes')!.onclick = async () => {
+      log('Testing Hermes API...')
+      try {
+        const response = await this.sendToHermes('Hello from Caduceus browser test')
+        log(`Hermes response: "${response}"`)
+      } catch (err) {
+        log(`Hermes error: ${err}`)
+      }
     }
   }
 
@@ -107,7 +228,7 @@ export class App {
         const eventType = event.textEvent.eventType
         switch (eventType) {
           case OsEventTypeList.CLICK_EVENT:
-          case undefined: // SDK normalizes 0 to undefined
+          case undefined:
             await this.handlePress()
             break
           case OsEventTypeList.DOUBLE_CLICK_EVENT:
@@ -131,36 +252,21 @@ export class App {
     const container = new CreateStartUpPageContainer({
       containerTotalNum: 3,
       textObject: [
-        // Title
         new TextContainerProperty({
-          xPosition: 0,
-          yPosition: 40,
-          width: 576,
-          height: 48,
-          containerID: 1,
-          containerName: 'title',
+          xPosition: 0, yPosition: 40, width: 576, height: 48,
+          containerID: 1, containerName: 'title',
           content: '  > CADETCEUS',
           isEventCapture: 0,
         }),
-        // Status
         new TextContainerProperty({
-          xPosition: 0,
-          yPosition: 100,
-          width: 576,
-          height: 96,
-          containerID: 2,
-          containerName: 'status',
+          xPosition: 0, yPosition: 100, width: 576, height: 96,
+          containerID: 2, containerName: 'status',
           content: 'Press to speak\nDouble-press to quit',
           isEventCapture: 0,
         }),
-        // Event capture area (invisible, covers full screen)
         new TextContainerProperty({
-          xPosition: 0,
-          yPosition: 0,
-          width: 576,
-          height: 288,
-          containerID: 3,
-          containerName: 'input',
+          xPosition: 0, yPosition: 0, width: 576, height: 288,
+          containerID: 3, containerName: 'input',
           content: '',
           isEventCapture: 1,
         }),
@@ -176,13 +282,11 @@ export class App {
    */
   private async handlePress(): Promise<void> {
     if (this.isRecording) {
-      // Stop recording and send to Hermes
       this.isRecording = false
       await this.bridge.audioControl(false)
       await this.updateStatus('Processing...')
       await this.processAudio()
     } else {
-      // Start recording
       this.isRecording = true
       this.audioChunks = []
       await this.bridge.audioControl(true)
@@ -201,9 +305,6 @@ export class App {
     await this.bridge.shutDownPageContainer(0)
   }
 
-  /**
-   * Handle scroll up — previous page.
-   */
   private handleScrollUp(): void {
     if (this.currentPage > 0) {
       this.currentPage--
@@ -211,9 +312,6 @@ export class App {
     }
   }
 
-  /**
-   * Handle scroll down — next page.
-   */
   private handleScrollDown(): void {
     if (this.currentPage < this.pages.length - 1) {
       this.currentPage++
@@ -249,7 +347,7 @@ export class App {
   }
 
   /**
-   * Process recorded audio — concatenate chunks and send to Hermes.
+   * Process recorded audio: concatenate PCM → WAV → STT → Hermes → Display
    */
   private async processAudio(): Promise<void> {
     if (this.audioChunks.length === 0) {
@@ -266,46 +364,47 @@ export class App {
       offset += chunk.length
     }
 
-    // For MVP: send raw PCM to a transcription endpoint,
-    // then send the transcribed text to Hermes.
-    // This will need a STT step — either on-device or via an API.
-    // For now, we'll use the Hermes API directly with a placeholder.
+    console.log(`[Caduceus] Captured ${pcmData.length} bytes PCM audio`)
 
     try {
-      const text = await this.transcribeAudio(pcmData)
-      await this.updateStatus(`You said:\n${text}`)
-      const response = await this.sendToHermes(text)
+      // Step 1: Speech-to-Text via Whisper
+      await this.updateStatus('Transcribing...')
+      const sttResult = await transcribe(pcmData, 16000, this.config.stt)
+      console.log(`[Caduceus] STT result: "${sttResult.text}" (lang: ${sttResult.language})`)
+
+      if (!sttResult.text.trim()) {
+        await this.updateStatus('Could not\nunderstand audio')
+        return
+      }
+
+      // Step 2: Send to Hermes
+      await this.updateStatus(`"${sttResult.text.slice(0, 80)}"`)
+      const response = await this.sendToHermes(sttResult.text)
+
+      // Step 3: Display response
       this.displayResponse(response)
     } catch (err) {
-      await this.updateStatus(`Error: ${err}`)
+      console.error('[Caduceus] Error:', err)
+      await this.updateStatus(`Error:\n${String(err).slice(0, 200)}`)
     }
   }
 
   /**
-   * Transcribe audio PCM data to text.
-   * TODO: Integrate with a real STT service (e.g., Whisper API).
-   */
-  private async transcribeAudio(_pcmData: Uint8Array): Promise<string> {
-    // Placeholder — in production, send PCM to STT endpoint
-    // Options: OpenAI Whisper, Deepgram, local Whisper, etc.
-    console.log(`[Caduceus] Received ${_pcmData.length} bytes of PCM audio`)
-    console.log('[Caduceus] STT not yet implemented — using placeholder')
-    return 'Hello Hermes'
-  }
-
-  /**
-   * Send a text prompt to the Hermes API and get a response.
+   * Send a text prompt to the Hermes API.
    */
   private async sendToHermes(prompt: string): Promise<string> {
     console.log('[Caduceus] Sending to Hermes:', prompt)
 
-    const response = await fetch(`${this.hermesUrl}/v1/chat/completions`, {
+    const response = await fetch(`${this.config.hermesUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'default',
         messages: [
-          { role: 'system', content: 'You are Hermes, a concise AI assistant. Keep responses under 500 characters for display on smart glasses.' },
+          {
+            role: 'system',
+            content: 'You are Hermes, a concise AI assistant displayed on smart glasses. Keep responses under 500 characters. Use short sentences. No markdown formatting.',
+          },
           { role: 'user', content: prompt },
         ],
         max_tokens: 200,
@@ -313,7 +412,7 @@ export class App {
     })
 
     if (!response.ok) {
-      throw new Error(`Hermes API error: ${response.status}`)
+      throw new Error(`Hermes ${response.status}: ${await response.text()}`)
     }
 
     const data = await response.json()
@@ -321,8 +420,7 @@ export class App {
   }
 
   /**
-   * Display a response on the glasses, paginated.
-   * Each page holds ~400 characters (recommended by Even Hub guidelines).
+   * Display a response on the glasses, paginated at ~400 chars per page.
    */
   private displayResponse(text: string): void {
     const pageSize = 400
@@ -333,7 +431,7 @@ export class App {
     }
 
     if (this.pages.length === 0) {
-      this.pages = ['(empty response)']
+      this.pages = ['(empty)']
     }
 
     this.currentPage = 0
@@ -344,11 +442,10 @@ export class App {
    * Show a specific page on the glasses display.
    */
   private showPage(index: number): void {
-    const pageContent = this.pages[index]
+    const content = this.pages[index]
     const pageInfo = this.pages.length > 1
       ? `── ${index + 1}/${this.pages.length} ──\n`
       : ''
-
-    this.updateStatus(`${pageInfo}${pageContent}`)
+    this.updateStatus(`${pageInfo}${content}`)
   }
 }

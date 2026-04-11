@@ -73,12 +73,16 @@ vite.config.ts   # Vite config (network exposure for sideloading)
 - [x] Bridge initialization and event handling
 - [x] Display containers (welcome, status, pagination)
 - [x] Touch input (press, double-press, scroll)
-- [x] Audio capture (PCM from glasses mic)
-- [ ] Speech-to-Text integration (STT)
-- [ ] Hermes API integration (production endpoint + auth)
-- [ ] Settings screen (Hermes URL, API key)
-- [ ] Simulator testing
-- [ ] QR sideload testing on real hardware
+- [x] Audio capture (PCM 16kHz from glasses mic)
+- [x] PCM → WAV converter (pure JS, zero dependencies)
+- [x] Speech-to-Text via Whisper API (LiteLLM proxy)
+- [x] Hermes API integration
+- [x] Browser fallback with config UI and mic test
+- [x] Config persistence (localStorage)
+- [ ] Real hardware testing via QR sideload
+- [ ] Settings screen on glasses (Hermes URL, API key)
+- [ ] Optimized system prompt for glasses display
+- [ ] Error handling and retry logic
 
 ## SDK Reference
 
