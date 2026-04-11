@@ -79,12 +79,14 @@ function friendlyError(err: unknown): string {
 /** Configuration — persisted in localStorage, editable via WebUI */
 interface CaduceusConfig {
   hermesUrl: string
+  hermesApiKey: string
   stt: SttConfig
   onboarded: boolean
 }
 
 const DEFAULT_CONFIG: CaduceusConfig = {
   hermesUrl: '',
+  hermesApiKey: '',
   stt: {
     apiUrl: '',
     apiKey: '',
@@ -252,6 +254,11 @@ export class App {
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
         </div>
         <div style="margin-bottom: 12px;">
+          <label style="display:block; margin-bottom: 4px;">Hermes API Key (optional):</label>
+          <input id="cfg-hermes-key" type="password" value=""
+                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        </div>
+        <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">STT Endpoint:</label>
           <input id="cfg-stt-url" type="text" value=""
                  style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
@@ -276,6 +283,7 @@ export class App {
     // Set config values via DOM API to prevent XSS from template literal injection
     const setVal = (id: string, val: string) => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = val }
     setVal('cfg-hermes', this.config.hermesUrl)
+    setVal('cfg-hermes-key', this.config.hermesApiKey)
     setVal('cfg-stt-url', this.config.stt.apiUrl)
     setVal('cfg-stt-model', this.config.stt.model)
     setVal('cfg-stt-key', this.config.stt.apiKey)
@@ -309,6 +317,7 @@ export class App {
     // Save config
     document.getElementById('btn-save')!.onclick = () => {
       this.config.hermesUrl = (document.getElementById('cfg-hermes') as HTMLInputElement).value
+      this.config.hermesApiKey = (document.getElementById('cfg-hermes-key') as HTMLInputElement).value
       this.config.stt.apiUrl = (document.getElementById('cfg-stt-url') as HTMLInputElement).value
       this.config.stt.model = (document.getElementById('cfg-stt-model') as HTMLInputElement).value
       this.config.stt.apiKey = (document.getElementById('cfg-stt-key') as HTMLInputElement).value
@@ -609,7 +618,10 @@ export class App {
 
     const response = await fetchWithRetry(`${this.config.hermesUrl}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.config.hermesApiKey ? { 'Authorization': `Bearer ${this.config.hermesApiKey}` } : {}),
+      },
       body: JSON.stringify({
         model: 'default',
         messages: [
