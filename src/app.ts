@@ -245,39 +245,39 @@ export class App {
   private initWebUI(): void {
     const app = document.getElementById('app')!
     app.innerHTML = `
-      <div style="padding: 20px; font-family: monospace; max-width: 576px; margin: 0 auto;">
+      <div class="caduceus-container">
         <h2>Caduceus</h2>
-        <hr style="margin: 16px 0;">
-        <div style="margin-bottom: 12px;">
-          <label style="display:block; margin-bottom: 4px;">Hermes URL:</label>
-          <input id="cfg-hermes" type="text" value=""
-                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        <hr>
+        <div class="field">
+          <label>Hermes URL:</label>
+          <input id="cfg-hermes" type="text" value="">
         </div>
-        <div style="margin-bottom: 12px;">
-          <label style="display:block; margin-bottom: 4px;">Hermes API Key (optional):</label>
-          <input id="cfg-hermes-key" type="password" value=""
-                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        <div class="field">
+          <label>Hermes API Key (optional):</label>
+          <input id="cfg-hermes-key" type="password" value="">
         </div>
-        <div style="margin-bottom: 12px;">
-          <label style="display:block; margin-bottom: 4px;">STT Endpoint:</label>
-          <input id="cfg-stt-url" type="text" value=""
-                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        <div class="field">
+          <label>STT Endpoint:</label>
+          <input id="cfg-stt-url" type="text" value="">
         </div>
-        <div style="margin-bottom: 12px;">
-          <label style="display:block; margin-bottom: 4px;">STT Model:</label>
-          <input id="cfg-stt-model" type="text" value=""
-                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        <div class="field">
+          <label>STT Model:</label>
+          <input id="cfg-stt-model" type="text" value="">
         </div>
-        <div style="margin-bottom: 16px;">
-          <label style="display:block; margin-bottom: 4px;">STT API Key (optional):</label>
-          <input id="cfg-stt-key" type="password" value=""
-                 style="width:100%; padding:8px; background:#1a1a1a; color:#0f0; border:1px solid #333;">
+        <div class="field">
+          <label>STT API Key (optional):</label>
+          <input id="cfg-stt-key" type="password" value="">
         </div>
-        <button id="btn-save" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Save Config</button>
-        <button id="btn-record" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Mic Test (STT)</button>
-        <button id="btn-hermes" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Test Hermes</button>
-        <button id="btn-reset" style="padding: 8px 16px; cursor: pointer; color: #f80; border-color: #f80;">Reset</button>
-        <pre id="debug-output" style="margin-top: 16px; padding: 12px; background: #111; color: #0f0; font-size: 12px; max-height: 400px; overflow: auto; white-space: pre-wrap;"></pre>
+        <div class="btn-row">
+          <button id="btn-save">Save Config</button>
+          <button id="btn-record">Mic Test (STT)</button>
+          <button id="btn-hermes">Test Hermes</button>
+          <button id="btn-reset" class="btn-reset">Reset</button>
+        </div>
+        <div class="debug-log-wrapper">
+          <button class="debug-log-toggle" id="debug-toggle">Debug Log</button>
+          <pre id="debug-output"></pre>
+        </div>
       </div>
     `
     // Set config values via DOM API to prevent XSS from template literal injection
@@ -313,6 +313,24 @@ export class App {
     }
 
     log('Caduceus started')
+
+    // Debug log toggle (collapsible on mobile)
+    const debugWrapper = document.querySelector('.debug-log-wrapper') as HTMLElement
+    const debugToggle = document.getElementById('debug-toggle') as HTMLButtonElement
+    if (debugWrapper && debugToggle) {
+      // Auto-collapse on mobile
+      if (window.innerWidth <= 576) {
+        debugWrapper.classList.add('debug-log-collapsed')
+      }
+      debugToggle.onclick = () => {
+        debugWrapper.classList.toggle('debug-log-collapsed')
+        debugToggle.textContent = debugWrapper.classList.contains('debug-log-collapsed')
+          ? 'Debug Log [+]' : 'Debug Log [-]'
+      }
+      // Update toggle label based on initial state
+      debugToggle.textContent = debugWrapper.classList.contains('debug-log-collapsed')
+        ? 'Debug Log [+]' : 'Debug Log [-]'
+    }
 
     // Save config
     document.getElementById('btn-save')!.onclick = () => {
