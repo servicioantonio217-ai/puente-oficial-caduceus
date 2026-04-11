@@ -10,11 +10,25 @@ Voice-first integration of the [Even Realities G2](https://www.evenrealities.com
 │ (display +   │           │ (Caduceus app)   │       │   (API)      │
 │  mic input)  │           │                  │       └──────────────┘
 └──────────────┘           └──────────────────┘
+                                     │
+                                     ▼ HTTPS
+                            ┌──────────────────┐
+                            │ STT (Whisper API)│
+                            └──────────────────┘
 ```
 
 - **Audio In**: Glasses 4-mic array captures PCM 16kHz → STT → Hermes prompt
-- **Display Out**: Hermes response → paginated text → glasses display (576×288px, 4-bit greyscale)
+- **Display Out**: Hermes response → paginated text → glasses display (576x288px, 4-bit greyscale)
 - **Input**: Touchpad press (toggle recording), double-press (quit), swipe (scroll pages)
+
+## Privacy
+
+Caduceus sends data exclusively to endpoints you configure. There are no analytics, telemetry, or third-party tracking mechanisms.
+
+- Audio is sent to your configured Speech-to-Text endpoint
+- Transcripts are sent to your configured Hermes Agent endpoint
+- Configuration is stored locally on your device (localStorage)
+- No audio, transcripts, or conversation history is stored by Caduceus
 
 ## Development
 
@@ -46,13 +60,14 @@ Scan the QR code with the Even Realities App to load Caduceus directly with hot 
 
 ### Simulator (no hardware needed)
 
-The app includes a browser fallback that shows a debug UI when the Even Hub bridge is not detected. Just open `http://localhost:5173` in any browser.
+The app includes a companion WebUI that works in any browser. Open `http://localhost:5173` to configure settings, test the microphone, and debug.
 
 ### Build
 
 ```bash
-npm run build
-npm run preview  # Serve production build locally
+npm run build          # Production build → dist/
+npm run preview        # Serve production build locally
+npm run pack           # Build + package as .ehpk for Even Hub submission
 ```
 
 ## Project Structure
@@ -60,12 +75,25 @@ npm run preview  # Serve production build locally
 ```
 src/
 ├── main.ts      # Entry point
-├── app.ts       # Main Caduceus app logic (bridge, events, Hermes API)
-├── style.css    # Minimal styles (browser fallback only)
+├── app.ts       # Main Caduceus app logic (onboarding, bridge, events, Hermes API)
+├── stt.ts       # Speech-to-Text integration (PCM → WAV → Whisper)
+├── style.css    # WebUI styles (browser companion)
+├── pcm-to-wav.ts # PCM to WAV converter (pure JS)
 └── vite-env.d.ts
 app.json         # Even Hub manifest
 vite.config.ts   # Vite config (network exposure for sideloading)
 ```
+
+## First Launch
+
+On first launch, Caduceus shows a setup wizard:
+
+1. Enter your **Hermes URL** (e.g., `http://your-server:3000`)
+2. Enter your **STT Endpoint** (e.g., `http://your-server:4000`)
+3. Optionally set an **STT API Key** and **model**
+4. Click **Save and Start**
+
+Settings can be changed later via the companion WebUI. Use the **Reset** button to return to the setup wizard.
 
 ## Current Status
 
@@ -75,14 +103,15 @@ vite.config.ts   # Vite config (network exposure for sideloading)
 - [x] Touch input (press, double-press, scroll)
 - [x] Audio capture (PCM 16kHz from glasses mic)
 - [x] PCM → WAV converter (pure JS, zero dependencies)
-- [x] Speech-to-Text via Whisper API (LiteLLM proxy)
+- [x] Speech-to-Text via Whisper API
 - [x] Hermes API integration
-- [x] Browser fallback with config UI and mic test
+- [x] Companion WebUI with config and mic test
 - [x] Config persistence (localStorage)
+- [x] Onboarding flow (first-launch setup wizard)
+- [x] Privacy policy (embedded in onboarding)
+- [x] Even Hub manifest (app.json) with proper packaging
 - [ ] Real hardware testing via QR sideload
-- [ ] Settings screen on glasses (Hermes URL, API key)
-- [ ] Optimized system prompt for glasses display
-- [ ] Error handling and retry logic
+- [ ] Even Hub submission and publication
 
 ## SDK Reference
 

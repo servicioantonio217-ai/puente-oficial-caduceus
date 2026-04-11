@@ -80,17 +80,19 @@ function friendlyError(err: unknown): string {
 interface CaduceusConfig {
   hermesUrl: string
   stt: SttConfig
+  onboarded: boolean
 }
 
 const DEFAULT_CONFIG: CaduceusConfig = {
-  hermesUrl: 'http://10.2.1.15:3000',
+  hermesUrl: '',
   stt: {
-    apiUrl: 'http://10.2.0.12:4000',
+    apiUrl: '',
     apiKey: '',
     model: 'whisper-1',
     language: null,
     responseFormat: 'json',
   },
+  onboarded: false,
 }
 
 export class App {
@@ -108,22 +110,24 @@ export class App {
     // Always load config first
     this.loadConfig()
 
-    // Always render WebUI (companion interface — phone or browser)
-    this.initWebUI()
+    // Show onboarding or main WebUI
+    if (!this.config.onboarded) {
+      this.initOnboarding()
+    } else {
+      this.initWebUI()
+    }
 
     // Try connecting to glasses bridge (runs independently of WebUI)
     try {
       this.bridge = await waitForEvenAppBridge()
       this.hasBridge = true
       console.log('[Caduceus] Bridge ready')
-      this.updateBridgeStatus(true)
 
       this.setupEventListeners()
       await this.showWelcome()
       console.log('[Caduceus] Ready — press to speak')
     } catch {
       console.warn('[Caduceus] Bridge not available — glasses mode disabled')
-      this.updateBridgeStatus(false)
     }
   }
 
@@ -148,6 +152,90 @@ export class App {
   }
 
   /**
+   * Onboarding screen — shown on first launch when no config exists.
+   * Guides the user through setting up Hermes URL and STT endpoint.
+   */
+  private initOnboarding(): void {
+    const app = document.getElementById('app')!
+    app.innerHTML = `
+      <div class="caduceus-container">
+        <h2>Caduceus Setup</h2>
+        <p style="color: #888; margin: 0 0 16px 0;">Connect your AI assistant to your G2 glasses.</p>
+        <hr>
+        <div class="field">
+          <label>Hermes URL:</label>
+          <input id="onb-hermes" type="text" placeholder="http://your-server:3000">
+          <small style="color: #666;">Your Hermes Agent API endpoint</small>
+        </div>
+        <div class="field">
+          <label>STT Endpoint:</label>
+          <input id="onb-stt-url" type="text" placeholder="http://your-server:4000">
+          <small style="color: #666;">Whisper-compatible Speech-to-Text API</small>
+        </div>
+        <div class="field">
+          <label>STT API Key (optional):</label>
+          <input id="onb-stt-key" type="password" placeholder="Leave empty if not required">
+        </div>
+        <div class="field">
+          <label>STT Model:</label>
+          <input id="onb-stt-model" type="text" value="whisper-1" placeholder="whisper-1">
+        </div>
+        <div class="btn-row">
+          <button id="btn-onb-save">Save and Start</button>
+        </div>
+        <p style="color: #555; font-size: 12px; margin-top: 16px;">
+          You can change these settings later in the companion WebUI.
+          Audio is sent to your own servers — see Privacy Policy below.
+        </p>
+        <hr>
+        <details style="margin-top: 8px;">
+          <summary style="cursor: pointer; color: #888; font-size: 12px;">Privacy Policy</summary>
+          <div style="margin-top: 8px; font-size: 12px; color: #666; line-height: 1.5;">
+            <p><strong>Data Collection:</strong> Caduceus sends audio recordings to your configured
+            Speech-to-Text endpoint and text prompts to your configured Hermes Agent endpoint.
+            No data is sent to any third-party server beyond what you configure.</p>
+            <p><strong>Audio Processing:</strong> Microphone audio from the G2 glasses (PCM 16kHz)
+            is converted to WAV and sent to your STT service for transcription. The transcription
+            text is then forwarded to your Hermes Agent for AI response generation.</p>
+            <p><strong>Storage:</strong> All configuration is stored locally on your device (localStorage).
+            No audio, transcripts, or conversation history is stored by Caduceus itself.</p>
+            <p><strong>Network:</strong> Caduceus communicates exclusively with the endpoints you
+            configure. There are no analytics, telemetry, or tracking mechanisms.</p>
+            <p><strong>Open Source:</strong> Caduceus is open-source software. You can audit the code
+            at gitlab.pfandl.cloud/coding-agent/g2-caduceus</p>
+          </div>
+        </details>
+      </div>
+    `
+
+    document.getElementById('btn-onb-save')!.onclick = () => {
+      const hermesUrl = (document.getElementById('onb-hermes') as HTMLInputElement).value.trim()
+      const sttUrl = (document.getElementById('onb-stt-url') as HTMLInputElement).value.trim()
+      const sttKey = (document.getElementById('onb-stt-key') as HTMLInputElement).value.trim()
+      const sttModel = (document.getElementById('onb-stt-model') as HTMLInputElement).value.trim()
+
+      if (!hermesUrl) {
+        alert('Please enter your Hermes URL')
+        return
+      }
+      if (!sttUrl) {
+        alert('Please enter your STT Endpoint')
+        return
+      }
+
+      this.config.hermesUrl = hermesUrl
+      this.config.stt.apiUrl = sttUrl
+      this.config.stt.apiKey = sttKey
+      this.config.stt.model = sttModel || 'whisper-1'
+      this.config.onboarded = true
+      this.saveConfig()
+
+      console.log('[Caduceus] Onboarding complete — switching to main UI')
+      this.initWebUI()
+    }
+  }
+
+  /**
    * WebUI — always rendered as companion interface.
    * Shows settings, status, mic test, and debug log.
    * Works on phone (Even Hub WebView) and in regular browsers.
@@ -157,7 +245,6 @@ export class App {
     app.innerHTML = `
       <div style="padding: 20px; font-family: monospace; max-width: 576px; margin: 0 auto;">
         <h2>Caduceus</h2>
-        <p id="bridge-status" style="color: #666;">Checking glasses connection...</p>
         <hr style="margin: 16px 0;">
         <div style="margin-bottom: 12px;">
           <label style="display:block; margin-bottom: 4px;">Hermes URL:</label>
@@ -181,7 +268,8 @@ export class App {
         </div>
         <button id="btn-save" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Save Config</button>
         <button id="btn-record" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Mic Test (STT)</button>
-        <button id="btn-hermes" style="padding: 8px 16px; cursor: pointer;">Test Hermes</button>
+        <button id="btn-hermes" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Test Hermes</button>
+        <button id="btn-reset" style="padding: 8px 16px; cursor: pointer; color: #f80; border-color: #f80;">Reset</button>
         <pre id="debug-output" style="margin-top: 16px; padding: 12px; background: #111; color: #0f0; font-size: 12px; max-height: 400px; overflow: auto; white-space: pre-wrap;"></pre>
       </div>
     `
@@ -277,16 +365,15 @@ export class App {
         log(`Hermes error: ${err}`)
       }
     }
-  }
 
-  /**
-   * Update the bridge status indicator in the WebUI.
-   */
-  private updateBridgeStatus(connected: boolean): void {
-    const el = document.getElementById('bridge-status')
-    if (el) {
-      el.textContent = connected ? 'Glasses: connected' : 'Glasses: not connected (browser mode)'
-      el.style.color = connected ? '#0f0' : '#f80'
+    // Reset config — go back to onboarding
+    document.getElementById('btn-reset')!.onclick = () => {
+      if (confirm('Reset all settings and start setup again?')) {
+        localStorage.removeItem('caduceus_config')
+        this.config = { ...DEFAULT_CONFIG }
+        console.log('[Caduceus] Config reset — returning to onboarding')
+        this.initOnboarding()
+      }
     }
   }
 
