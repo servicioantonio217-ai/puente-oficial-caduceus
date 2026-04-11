@@ -286,6 +286,24 @@ export class App {
       debug.textContent += `[${ts}] ${msg}\n`
       debug.scrollTop = debug.scrollHeight
     }
+
+    /** Helper to disable/enable a button with visual feedback */
+    const withButton = async (id: string, label: string, fn: () => Promise<void>) => {
+      const btn = document.getElementById(id) as HTMLButtonElement
+      if (!btn) return
+      const orig = btn.textContent ?? label
+      btn.disabled = true
+      btn.textContent = `${label}...`
+      btn.style.opacity = '0.6'
+      try {
+        await fn()
+      } finally {
+        btn.disabled = false
+        btn.textContent = orig
+        btn.style.opacity = '1'
+      }
+    }
+
     log('Caduceus started')
 
     // Save config
@@ -299,7 +317,7 @@ export class App {
     }
 
     // STT test — uses browser MediaRecorder for real mic input
-    document.getElementById('btn-record')!.onclick = async () => {
+    document.getElementById('btn-record')!.onclick = () => withButton('btn-record', 'Mic Test', async () => {
       log('Requesting microphone access...')
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -317,7 +335,7 @@ export class App {
           const blob = new Blob(chunks, { type: 'audio/webm' })
           log(`Recorded ${blob.size} bytes (webm)`)
 
-          // Send to Whisper via LiteLLM
+          // Send to Whisper via STT endpoint
           const formData = new FormData()
           formData.append('file', blob, 'recording.webm')
           formData.append('model', this.config.stt.model)
@@ -328,9 +346,10 @@ export class App {
             headers['Authorization'] = `Bearer ${this.config.stt.apiKey}`
           }
 
-          log(`Sending to ${this.config.stt.apiUrl}/v1/audio/transcriptions ...`)
+          const sttUrl = `${this.config.stt.apiUrl}/v1/audio/transcriptions`
+          log(`Sending to ${sttUrl} ...`)
           try {
-            const resp = await fetch(`${this.config.stt.apiUrl}/v1/audio/transcriptions`, {
+            const resp = await fetch(sttUrl, {
               method: 'POST',
               headers,
               body: formData,
@@ -338,33 +357,56 @@ export class App {
             if (!resp.ok) {
               const err = await resp.text()
               log(`STT error ${resp.status}: ${err}`)
+              if (resp.type === 'opaque') {
+                log('Hint: This may be a CORS issue — ensure the STT server allows requests from this origin')
+              }
               return
             }
             const data = await resp.json()
             log(`Transcription: "${data.text}"`)
             if (data.language) log(`Detected language: ${data.language}`)
           } catch (err) {
-            log(`STT fetch error: ${err}`)
+            const msg = err instanceof Error ? err.message : String(err)
+            if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+              log(`STT fetch error: ${msg}`)
+              log('Hint: Check that the STT endpoint is reachable and has CORS headers configured')
+            } else {
+              log(`STT fetch error: ${msg}`)
+            }
           }
         }
 
         recorder.start()
         setTimeout(() => recorder.stop(), 3000)
       } catch (err) {
-        log(`Mic error: ${err}`)
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('Permission') || msg.includes('NotAllowed')) {
+          log(`Mic error: Permission denied — microphone access was rejected`)
+          log('Hint: Allow microphone access in browser settings or use HTTPS')
+        } else if (msg.includes('NotFoundError')) {
+          log(`Mic error: No microphone found`)
+        } else {
+          log(`Mic error: ${msg}`)
+        }
       }
-    }
+    })
 
     // Hermes test
-    document.getElementById('btn-hermes')!.onclick = async () => {
+    document.getElementById('btn-hermes')!.onclick = () => withButton('btn-hermes', 'Test Hermes', async () => {
       log('Testing Hermes API...')
       try {
         const response = await this.sendToHermes('Hello from Caduceus browser test')
         log(`Hermes response: "${response}"`)
       } catch (err) {
-        log(`Hermes error: ${err}`)
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+          log(`Hermes error: ${msg}`)
+          log('Hint: Check that the Hermes URL is reachable and has CORS headers configured')
+        } else {
+          log(`Hermes error: ${msg}`)
+        }
       }
-    }
+    }))
 
     // Reset config — go back to onboarding
     document.getElementById('btn-reset')!.onclick = () => {
