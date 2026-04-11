@@ -5,11 +5,11 @@ Voice-first integration of the [Even Realities G2](https://www.evenrealities.com
 ## Architecture
 
 ```
-┌──────────────┐ Bluetooth ┌──────────────────┐ HTTPS ┌──────────────┐
+┌──────────────┐ Bluetooth  ┌──────────────────┐ HTTPS  ┌──────────────┐
 │  G2 Glasses  │ ◄────────► │ Phone (WebView)  │ ◄────► │ Hermes Agent │
-│ (display +   │           │ (Caduceus app)   │       │   (API)      │
-│  mic input)  │           │                  │       └──────────────┘
-└──────────────┘           └──────────────────┘
+│ (display +   │            │ (Caduceus app)   │        │   (API)      │
+│  mic input)  │            │                  │        └──────────────┘
+└──────────────┘            └──────────────────┘
                                      │
                                      ▼ HTTPS
                             ┌──────────────────┐
