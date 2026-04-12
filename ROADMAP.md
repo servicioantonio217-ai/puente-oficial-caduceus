@@ -12,19 +12,19 @@ Each phase is self-contained and testable independently.
 
 > Goal: Working text-based chat via Bridge → AI Agent. Testable with curl.
 
-- [ ] Project scaffold (pyproject.toml, FastAPI app, config via env vars)
-- [ ] SQLite database setup (sessions + messages tables)
-- [ ] Token authentication (client token, agent API key)
-- [ ] Session CRUD endpoints (create, list, get, delete)
-- [ ] `POST /v1/sessions/{id}/message` — forward to AI Agent, return response
-- [ ] OpenAI Responses API compatible response format
-- [ ] Response truncation (hard character limit, clean sentence boundary)
-- [ ] Health endpoint (`GET /health`)
-- [ ] Dockerfile
-- [ ] `.gitlab-ci.yml` — lint (ruff), type check (mypy), unit tests (pytest), Docker build
-- [ ] Basic README with setup instructions
+- [x] Project scaffold (pyproject.toml, FastAPI app, config via env vars)
+- [x] SQLite database setup (sessions + messages tables)
+- [x] Token authentication (client token, agent API key)
+- [x] Session CRUD endpoints (create, list, get, delete)
+- [x] `POST /v1/sessions/{id}/message` — forward to AI Agent, return response
+- [x] OpenAI Responses API compatible response format
+- [x] Response truncation (hard character limit, clean sentence boundary)
+- [x] Health endpoint (`GET /health`)
+- [x] Dockerfile (Podman)
+- [x] `.gitlab-ci.yml` — lint (ruff), type check (mypy), unit tests (pytest), Podman build
+- [x] Basic README with setup instructions
 
-**Milestone:** `curl`-testable text chat loop + green CI pipeline.
+**Milestone:** `curl`-testable text chat loop + green CI pipeline. ✅
 
 ---
 
@@ -32,21 +32,21 @@ Each phase is self-contained and testable independently.
 
 > Goal: Even Hub app with text chat on G2 glasses via Bridge. No voice yet.
 
-- [ ] Project scaffold (Vite + TypeScript + even-toolkit + Even Hub SDK)
-- [ ] `app.json` manifest (permissions, metadata)
-- [ ] Screen router setup (even-toolkit `createGlassScreenRouter`)
-- [ ] Screens: Splash → Menu → Chat → Settings
-- [ ] Bridge API client (fetch wrapper, token auth, SSE streaming)
-- [ ] Chat display (even-toolkit `buildChatDisplay` with prefixes)
-- [ ] Menu screen (list: New Session, Sessions, Settings)
-- [ ] Sessions screen (scrollable list of existing sessions)
-- [ ] Settings screen (bridge URL + token input, save to SDK localStorage)
-- [ ] Navigation between screens (scroll, tap, back)
-- [ ] Exit mechanism (double-tap → system confirmation)
+- [x] Project scaffold (Vite + TypeScript + even-toolkit + Even Hub SDK)
+- [x] `app.json` manifest (permissions, metadata)
+- [x] Screen router setup (even-toolkit `createGlassScreenRouter`)
+- [x] Screens: Splash → Menu → Chat → Settings
+- [x] Bridge API client (fetch wrapper, token auth, SSE streaming)
+- [x] Chat display (even-toolkit `buildChatDisplay` with prefixes)
+- [x] Menu screen (list: New Session, Sessions, Settings)
+- [x] Sessions screen (scrollable list of existing sessions)
+- [x] Settings screen (bridge URL + token input, save to SDK localStorage)
+- [x] Navigation between screens (scroll, tap, back)
+- [x] Exit mechanism (double-tap → system confirmation)
 - [ ] QR sideload dev workflow
-- [ ] CI: extend `.gitlab-ci.yml` — lint (eslint), type check (tsc), build (vite)
+- [x] CI: extend `.gitlab-ci.yml` — lint (eslint), type check (tsc), build (vite)
 
-**Milestone:** Text chat on G2 glasses + green CI pipeline. Type on phone WebUI → see response on glasses.
+**Milestone:** Text chat on G2 glasses + green CI pipeline. Type on phone WebUI → see response on glasses. ✅ (pending QR sideload verification)
 
 ---
 
@@ -108,7 +108,7 @@ Each phase is self-contained and testable independently.
 ## Current Status
 
 - [x] Architecture document finalized
-- [ ] Phase 1 — Bridge MVP
-- [ ] Phase 2 — App Scaffold
+- [x] Phase 1 — Bridge MVP
+- [x] Phase 2 — App Scaffold (pending QR sideload verification)
 - [ ] Phase 3 — Voice Pipeline
 - [ ] Phase 4 — Polish & OSS Readiness

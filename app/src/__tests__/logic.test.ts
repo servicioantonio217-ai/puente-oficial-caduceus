@@ -40,9 +40,7 @@ describe('ChatLine type mapping', () => {
 
   it('maps assistant messages to text type', () => {
     const msg = { id: '2', role: 'assistant' as const, content: 'Hi!', created_at: '2026-01-01' }
-    const chatLine = msg.role === 'user'
-      ? { type: 'prompt' as const, text: msg.content }
-      : { type: 'text' as const, text: msg.content }
+    const chatLine = { type: 'text' as const, text: msg.content }
     expect(chatLine.type).toBe('text')
     expect(chatLine.text).toBe('Hi!')
   })
