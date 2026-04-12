@@ -20,16 +20,16 @@ const MENU_ITEMS = ['New Session', drillLabel('Sessions')] as const
  * via nav.screen change (not via deriveScreen).
  */
 export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
-  display(snapshot) {
+  display(snapshot, nav) {
     const headerStatus = snapshot.connected ? 'Connected' : 'Disconnected'
-    const title = fieldJoin('G2 CADUCEUS', headerStatus)
+    const title = fieldJoin('Caduceus', headerStatus)
 
     const lines = [
       { text: title, inverted: false, style: 'normal' as const },
       { text: '', inverted: false, style: 'separator' as const },
       ...buildScrollableList({
         items: [...MENU_ITEMS],
-        highlightedIndex: 0, // Home always resets highlight to 0
+        highlightedIndex: nav.highlightedIndex,
         maxVisible: 5,
         formatter: (item) => item,
       }),

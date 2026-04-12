@@ -7,27 +7,35 @@ import type { AppSnapshot, AppActions } from '../shared'
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Follows even-toolkit per-screen architecture:
- * - buildChatDisplay for streaming AI output with ▲/▼ scroll
- * - buildStaticActionBar for recording toggle
- * - SELECT_HIGHLIGHTED toggles recording
- * - GO_BACK closes session and returns to home via nav.screen change
+ * Layout:
+ *   ┌─────────────────────┐
+ *   │ Session Name        │  ← title line (inverted header)
+ *   │─────────────────────│
+ *   │ You: ...            │  ← chat lines (scrollable)
+ *   │ AI: ...             │
+ *   │                     │
+ *   │─────────────────────│
+ *   │ [● Record]          │  ← action bar
+ *   └─────────────────────┘
+ *
+ * Empty state shows a centered hint.
+ * System messages use 'meta' style for visual separation.
+ * Auto-scrolls to bottom on new messages (highlightedIndex = max).
  */
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    const title = snapshot.currentSession?.name
-      ? snapshot.currentSession.name
-      : 'Chat'
+    const title = snapshot.currentSession?.name ?? 'Caduceus'
 
-    // Action bar with recording toggle
+    // Action bar — single button, always at index 0
     const actionBar = buildStaticActionBar(
-      [snapshot.isRecording ? 'Stop Rec' : 'Record'],
+      [snapshot.isRecording ? '■ Stop' : '● Record'],
       0,
     )
 
+    // Build chat lines with empty state
     const lines = snapshot.chatLines.length > 0
       ? snapshot.chatLines
-      : [{ type: 'system' as const, text: 'Tap to speak' }]
+      : [{ type: 'system' as const, text: 'Tap ● Record to start' }]
 
     return buildChatDisplay({
       title,
@@ -39,21 +47,23 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
 
   action(action, nav, snapshot, ctx) {
     if (action.type === 'GO_BACK') {
-      // Close the session context and explicitly return to home
       ctx.goBack()
       return { ...nav, screen: 'home', highlightedIndex: 0 }
     }
+
     if (action.type === 'SELECT_HIGHLIGHTED') {
       ctx.toggleRecording()
       return nav
     }
 
     if (action.type === 'HIGHLIGHT_MOVE') {
-      const maxScroll = calcMaxScroll(snapshot.chatLines.length, 7)
+      const visibleLines = 7
+      const maxScroll = calcMaxScroll(snapshot.chatLines.length, visibleLines)
       const delta = action.direction === 'up' ? 1 : -1
       const next = nav.highlightedIndex + delta
       return { ...nav, highlightedIndex: Math.max(0, Math.min(maxScroll, next)) }
     }
+
     return nav
   },
 }
