@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, ChatMessage, BridgeConfig, AgentResponse } from '../types'
-import type { ScreenName } from '../glass/shared'
+
 import * as api from '../api'
 import { loadConfig, saveConfig } from '../storage'
 import { EvenAudioBridge } from '../audio'
@@ -23,8 +23,9 @@ interface AppContextValue {
   isLoading: boolean
   isRecording: boolean
   error: string | null
-  glassScreen: ScreenName
-  setGlassScreen: (screen: ScreenName) => void
+  /** Current home panel: 'none' = menu only, 'sessions' | 'settings' = sub-panel */
+  homePanel: 'none' | 'sessions' | 'settings'
+  setHomePanel: (panel: 'none' | 'sessions' | 'settings') => void
   connect: () => Promise<void>
   disconnect: () => void
   refreshSessions: () => Promise<void>
@@ -47,7 +48,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [glassScreen, setGlassScreen] = useState<ScreenName>('menu')
+  const [homePanel, setHomePanel] = useState<'none' | 'sessions' | 'settings'>('none')
 
   const configRef = useRef(config)
   configRef.current = config
@@ -100,7 +101,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const detail = await api.getSession(configRef.current, session.id)
       setCurrentSession(detail)
       setMessages(detail.messages ?? [])
-      setGlassScreen('chat')
+      // Touch updated_at so session bubbles to top in glasses list
+      const now = new Date().toISOString()
+      setSessions((prev) =>
+        prev.map((s) => s.id === session.id ? { ...s, updated_at: now } : s),
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open session')
     } finally {
@@ -116,7 +121,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSessions((prev) => [session, ...prev])
       setCurrentSession(session)
       setMessages([])
-      setGlassScreen('chat')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create session')
     } finally {
@@ -131,7 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (currentSession?.id === id) {
         setCurrentSession(null)
         setMessages([])
-        setGlassScreen('menu')
+        setHomePanel('none')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete session')
@@ -271,7 +275,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         connected, sessions,
         currentSession, messages,
         isLoading, isRecording, error,
-        glassScreen, setGlassScreen,
+        homePanel, setHomePanel,
         connect, disconnect,
         refreshSessions, openSession,
         newSession, removeSession,
