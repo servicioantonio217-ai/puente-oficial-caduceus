@@ -5,7 +5,7 @@ import { calcMaxScroll } from 'even-toolkit/glass-nav'
 import type { AppSnapshot, AppActions } from '../shared'
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
-  display(snapshot, nav) {
+  display(snapshot, _nav) {
     const title = snapshot.currentSession?.name
       ? `Chat: ${snapshot.currentSession.name}`
       : 'Chat'

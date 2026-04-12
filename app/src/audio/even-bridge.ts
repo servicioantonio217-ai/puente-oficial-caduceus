@@ -67,7 +67,7 @@ export class EvenAudioBridge {
 
     // Start the recorder with callbacks
     this.options.recorder.start({
-      onAudioLevel: (_level: number) => {
+      onAudioLevel: () => {
         // Could update a VU meter in the UI
       },
       onSilenceStart: () => {

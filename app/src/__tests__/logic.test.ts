@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import * as api from '../api'
+import { describe, it, expect } from 'vitest'
 import type { BridgeConfig } from '../types'
 
 // These tests cover the API client, storage, and pure logic.
