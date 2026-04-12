@@ -31,12 +31,12 @@ npx @evenrealities/evenhub-simulator@latest http://localhost:5173
 
 ## Configuration
 
-Configure the Bridge connection in the Settings screen:
+Configure the Bridge connection in the phone WebUI (Settings screen):
 
 1. **Server URL** — Your G2 Bridge address (e.g., `http://192.168.1.100:8643`)
 2. **Client Token** — The `G2_BRIDGE_TOKEN` from your Bridge server
 
-Settings are stored locally on your device via localStorage.
+Settings are stored locally on your device via localStorage. There is no settings screen on the glasses — all configuration happens on the phone.
 
 ## Build for Even Hub
 
@@ -63,21 +63,26 @@ app/
 │   ├── glass/
 │   │   ├── shared.ts           # Snapshot + Actions types
 │   │   ├── selectors.ts        # Screen router wiring
-│   │   ├── splash.ts           # Splash screen (caduceus icon)
+│   │   ├── splash.ts           # Splash screen (disabled)
 │   │   ├── AppGlasses.tsx      # useGlasses hook integration
+│   │   ├── ui-helpers.ts       # G2 display helpers
 │   │   └── screens/
-│   │       ├── menu.ts         # Main menu (glasses)
+│   │       ├── home.ts         # Home menu (glasses)
 │   │       ├── sessions.ts     # Session browser (glasses)
-│   │       ├── chat.ts         # Chat display (glasses, buildChatDisplay)
-│   │       └── settings.ts     # Settings display (glasses)
+│   │       └── chat.ts         # Chat display (glasses)
 │   ├── screens/
 │   │   ├── ChatScreen.tsx      # Chat WebUI (phone)
 │   │   ├── SessionsScreen.tsx  # Session browser WebUI (phone)
 │   │   └── Settings.tsx        # Settings WebUI (phone)
+│   ├── audio/
+│   │   ├── index.ts            # Audio module exports
+│   │   ├── recorder.ts         # VAD + PCM capture
+│   │   └── even-bridge.ts      # EvenAppBridge wrapper
 │   └── __tests__/
 │       ├── api.test.ts         # API client tests
-│       ├── storage.test.ts     # Storage tests
-│       └── screens.test.ts     # Glass screen logic tests
+│       ├── audio.test.ts       # Audio module tests
+│       ├── logic.test.ts       # Logic tests
+│       └── storage.test.ts     # Storage tests
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
@@ -88,8 +93,8 @@ app/
 
 | Screen | Content | Navigation |
 |--------|---------|------------|
-| **Splash** | G2 Caduceus logo | Auto-advance on connect |
-| **Menu** | New Session, Sessions, Settings | Scroll + Tap |
-| **Sessions** | Scrollable session list | Scroll + Tap to open |
-| **Chat** | AI conversation (buildChatDisplay) | Scroll for pagination |
-| **Settings** | Connection status | Scroll |
+| **Home** | New Session, Sessions | Scroll + Tap |
+| **Sessions** | Scrollable session list | Scroll + Tap to open, Back |
+| **Chat** | Status header + AI conversation | Scroll for history, Tap to record |
+
+Settings are WebUI-only (phone companion). No settings screen on glasses.

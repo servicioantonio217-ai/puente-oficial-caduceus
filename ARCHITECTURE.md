@@ -156,12 +156,12 @@ An Even Hub app running in the Even Realities App's WebView. Built with TypeScri
 
 | Screen | Content | Navigation |
 |--------|---------|------------|
-| **Splash** | App logo + loading state | Auto-advance on bridge connect |
-| **Menu** | List: New Session, Sessions, Settings | Scroll + Tap to select |
-| **Sessions** | Scrollable list of existing sessions | Scroll + Tap to open, Back to menu |
-| **Chat** | AI conversation display with prefixes | Scroll for pagination, Double-tap for new recording |
-| **Recording** | Live audio indicator + "Listening..." | Auto-stop on VAD silence, or Double-tap to cancel |
-| **Settings** | Bridge URL, token, display prefs | Scroll + Tap to edit, Back to menu |
+| **Splash** | Disabled (no pixel spinner on G2) | N/A |
+| **Home** | List: New Session, Sessions | Scroll + Tap to select |
+| **Sessions** | Scrollable list of existing sessions | Scroll + Tap to open, Back to home |
+| **Chat** | Status header + AI conversation display | Scroll for history, Tap to record |
+
+Settings (bridge URL, token) are configured via the phone WebUI companion, not on glasses.
 
 **Chat display format (even-toolkit `buildChatDisplay`):**
 - `> ` prefix — user prompt
@@ -269,12 +269,10 @@ g2-caduceus/
 │   ├── src/
 │   │   ├── main.ts              # Bridge init, event routing, page management
 │   │   ├── screens/             # Per-screen modules (even-toolkit screen router)
-│   │   │   ├── splash.ts        # Splash screen
-│   │   │   ├── menu.ts          # Main menu (new session, sessions, settings)
+│   │   │   ├── splash.ts        # Splash screen (disabled)
+│   │   │   ├── home.ts          # Home menu (new session, sessions)
 │   │   │   ├── sessions.ts      # Session list browser
-│   │   │   ├── chat.ts          # Chat display with AI responses
-│   │   │   ├── recording.ts     # Audio recording indicator
-│   │   │   └── settings.ts      # Bridge config + display prefs
+│   │   │   └── chat.ts          # Chat display with AI responses
 │   │   ├── state.ts             # App state management
 │   │   ├── audio.ts             # PCM capture + VAD + WAV conversion
 │   │   ├── api.ts               # Bridge API client (fetch wrapper)

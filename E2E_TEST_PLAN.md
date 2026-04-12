@@ -95,10 +95,10 @@ Or use the Even Realities app's built-in QR scanner.
 ### Step 3: Configure Bridge Connection
 
 1. Open the app on your phone (Even Hub companion WebUI)
-2. Go to Settings screen
+2. Go to Settings screen in the phone app
 3. Enter Bridge URL: `http://<YOUR_HOST_IP>:8643`
 4. Enter Bridge Token: (whatever G2_BRIDGE_TOKEN you set)
-5. Save settings
+5. Save settings and tap Connect
 
 ### Step 4: Create a Session
 
