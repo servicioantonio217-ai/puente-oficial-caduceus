@@ -67,6 +67,32 @@ class TestSTTClient:
         with pytest.raises(httpx.HTTPStatusError):
             await client.transcribe(b"\x00\x00" * 100, "test.wav")
 
+    @pytest.mark.asyncio
+    async def test_transcribe_handles_json_response(self):
+        """Some providers return JSON even with response_format=text."""
+        settings = Settings(stt_api_url="http://localhost:8080/v1/audio/transcriptions")
+        client = STTClient(settings)
+
+        mock_response = Response(200, text='{"text":"hello world","usage":null}')
+        client._client = AsyncMock()
+        client._client.post = AsyncMock(return_value=mock_response)
+
+        result = await client.transcribe(b"\x00\x00" * 100, "test.wav")
+        assert result == "hello world"
+
+    @pytest.mark.asyncio
+    async def test_transcribe_handles_empty_json_text(self):
+        """JSON response with empty text field returns empty string."""
+        settings = Settings(stt_api_url="http://localhost:8080/v1/audio/transcriptions")
+        client = STTClient(settings)
+
+        mock_response = Response(200, text='{"text":"","usage":null,"segments":[]}')
+        client._client = AsyncMock()
+        client._client.post = AsyncMock(return_value=mock_response)
+
+        result = await client.transcribe(b"\x00\x00" * 100, "test.wav")
+        assert result == ""
+
 
 # --- Audio Response Model Tests ---
 

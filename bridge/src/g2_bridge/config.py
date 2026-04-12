@@ -22,9 +22,13 @@ class Settings(BaseSettings):
     # STT (Speech-to-Text)
     stt_api_url: str = ""  # G2_STT_API_URL — e.g. http://localhost:8080/v1/audio/transcriptions
     stt_api_key: str = ""  # G2_STT_API_KEY — optional, if STT endpoint requires auth
+    stt_model: str = "whisper-1"  # G2_STT_MODEL — model name sent to STT endpoint
 
     # Storage
     database_path: str = "/data/g2_bridge.db"  # G2_DATABASE_PATH
+
+    # AI Agent behavior
+    agent_instructions: str = ""  # G2_AGENT_INSTRUCTIONS — optional system prompt for the agent
 
     # Response adaptation
     max_response_chars: int = 500  # G2_MAX_RESPONSE_CHARS

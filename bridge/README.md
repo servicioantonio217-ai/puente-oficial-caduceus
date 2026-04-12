@@ -35,6 +35,9 @@ All settings are configured via environment variables with the `G2_` prefix:
 | `G2_BRIDGE_TOKEN` | *(required)* | Client bearer token (phone → bridge) |
 | `G2_AGENT_API_KEY` | *(required)* | AI Agent API key (bridge → agent) |
 | `G2_AGENT_API_URL` | `http://localhost:8642/v1` | AI Agent Responses API base URL |
+| `G2_STT_API_URL` | *(empty)* | STT endpoint URL (e.g. `http://litellm:4000/v1/audio/transcriptions`). Required for voice input. |
+| `G2_STT_API_KEY` | *(empty)* | STT endpoint API key (optional) |
+| `G2_STT_MODEL` | `whisper-1` | Model name sent to STT endpoint |
 | `G2_DATABASE_PATH` | `/data/g2_bridge.db` | SQLite database file path |
 | `G2_MAX_RESPONSE_CHARS` | `500` | Max characters before response truncation |
 | `G2_HOST` | `0.0.0.0` | Listen host |
@@ -61,6 +64,7 @@ DELETE /v1/sessions/{id}         — Delete session
 
 ```
 POST /v1/sessions/{id}/message   — Send text, get AI response
+POST /v1/sessions/{id}/audio     — Send WAV audio, get transcript + AI response
 ```
 
 All endpoints require `Authorization: Bearer <G2_BRIDGE_TOKEN>`.

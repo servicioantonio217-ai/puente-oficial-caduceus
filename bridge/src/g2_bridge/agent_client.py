@@ -44,6 +44,8 @@ class AgentClient:
         }
         if conversation_id:
             payload["conversation"] = conversation_id
+        if self.settings.agent_instructions:
+            payload["instructions"] = self.settings.agent_instructions
 
         logger.debug("Sending to agent: %s", payload)
         response = await self._client.post("/responses", json=payload)

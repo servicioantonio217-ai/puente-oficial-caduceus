@@ -19,6 +19,7 @@ Each phase is self-contained and testable independently.
 - [x] `POST /v1/sessions/{id}/message` — forward to AI Agent, return response
 - [x] OpenAI Responses API compatible response format
 - [x] Response truncation (hard character limit, clean sentence boundary)
+- [x] Optional agent instructions (`G2_AGENT_INSTRUCTIONS` — custom system prompt)
 - [x] Health endpoint (`GET /health`)
 - [x] Dockerfile (Podman)
 - [x] `.gitlab-ci.yml` — lint (ruff), type check (mypy), unit tests (pytest), Podman build
