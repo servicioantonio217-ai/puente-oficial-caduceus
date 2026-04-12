@@ -10,6 +10,7 @@ import {
 import type { Session, ChatMessage, BridgeConfig, AgentResponse } from '../types'
 import * as api from '../api'
 import { loadConfig, saveConfig } from '../storage'
+import { EvenAudioBridge } from '../audio'
 
 interface AppContextValue {
   config: BridgeConfig
@@ -19,6 +20,7 @@ interface AppContextValue {
   currentSession: Session | null
   messages: ChatMessage[]
   isLoading: boolean
+  isRecording: boolean
   error: string | null
   connect: () => Promise<void>
   disconnect: () => void
@@ -27,6 +29,8 @@ interface AppContextValue {
   newSession: (name?: string) => Promise<void>
   removeSession: (id: string) => Promise<void>
   sendText: (content: string) => Promise<void>
+  startRecording: () => void
+  stopRecording: () => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -38,10 +42,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const configRef = useRef(config)
   configRef.current = config
+
+  const audioBridgeRef = useRef<EvenAudioBridge | null>(null)
 
   const setConfig = useCallback((c: BridgeConfig) => {
     setConfigState(c)
@@ -177,6 +184,71 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [currentSession, refreshSessions])
 
+  /** Start voice recording via G2 glasses. */
+  const startRecording = useCallback(() => {
+    if (!currentSession || isRecording) return
+
+    const { AudioRecorder } = require('../audio/recorder')
+    const recorder = new AudioRecorder()
+
+    const bridge = new EvenAudioBridge({
+      recorder,
+      onRecordingComplete: async (blob: Blob) => {
+        setIsRecording(false)
+        setError(null)
+
+        try {
+          const result = await api.sendAudio(configRef.current, currentSession.id, blob)
+
+          // Add transcript as user message
+          const userMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'user',
+            content: result.transcript,
+            created_at: new Date().toISOString(),
+          }
+          setMessages((prev) => [...prev, userMsg])
+
+          // Extract assistant response text
+          let assistantText = ''
+          for (const item of result.response.output ?? []) {
+            if (item.type === 'message') {
+              for (const part of item.content) {
+                if (part.type === 'output_text') {
+                  assistantText += part.text
+                }
+              }
+            }
+          }
+
+          const assistantMsg: ChatMessage = {
+            id: result.response.id ?? crypto.randomUUID(),
+            role: 'assistant',
+            content: assistantText,
+            created_at: new Date().toISOString(),
+          }
+          setMessages((prev) => [...prev, assistantMsg])
+          refreshSessions()
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Failed to process audio')
+        }
+      },
+      onRecordingCancelled: () => {
+        setIsRecording(false)
+      },
+    })
+
+    audioBridgeRef.current = bridge
+    setIsRecording(true)
+    bridge.start()
+  }, [currentSession, isRecording, refreshSessions])
+
+  /** Stop voice recording. */
+  const stopRecording = useCallback(() => {
+    audioBridgeRef.current?.stop()
+    audioBridgeRef.current = null
+  }, [])
+
   // Auto-connect on mount if config exists
   useEffect(() => {
     if (config.url && config.token) {
@@ -190,11 +262,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         config, setConfig,
         connected, sessions,
         currentSession, messages,
-        isLoading, error,
+        isLoading, isRecording, error,
         connect, disconnect,
         refreshSessions, openSession,
         newSession, removeSession,
-        sendText,
+        sendText, startRecording, stopRecording,
       }}
     >
       {children}

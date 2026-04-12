@@ -13,7 +13,8 @@ from g2_bridge.agent_client import AgentClient
 from g2_bridge.auth import AuthError
 from g2_bridge.config import Settings
 from g2_bridge.database import Database
-from g2_bridge.routers import health, messages, sessions
+from g2_bridge.routers import audio, health, messages, sessions
+from g2_bridge.stt_client import STTClient
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.agent = agent
     logger.info("Agent client initialized: %s", settings.agent_api_url)
 
+    # Initialize STT client
+    stt = STTClient(settings)
+    app.state.stt = stt
+    if settings.stt_configured:
+        logger.info("STT client initialized: %s", settings.stt_api_url)
+    else:
+        logger.warning("STT not configured. Set G2_STT_API_URL for voice input.")
+
     if not settings.is_configured:
         logger.warning("Bridge not fully configured. Set G2_BRIDGE_TOKEN and G2_AGENT_API_KEY.")
 
     yield
 
     # Shutdown
+    await stt.close()
     await agent.close()
     await db.close()
     logger.info("Shutdown complete")
@@ -66,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(sessions.router)
     app.include_router(messages.router)
+    app.include_router(audio.router)
 
     return app
 

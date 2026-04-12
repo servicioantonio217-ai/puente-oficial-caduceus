@@ -12,6 +12,7 @@ export interface AppSnapshot {
   menuItems: string[]
   sessionItems: string[]
   flashPhase: boolean
+  isRecording: boolean
 }
 
 export interface AppActions {
@@ -19,4 +20,5 @@ export interface AppActions {
   openSession: (session: Session) => void
   newSession: () => void
   sendMessage: (text: string) => void
+  toggleRecording: () => void
 }

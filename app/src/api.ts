@@ -72,3 +72,23 @@ export async function sendMessage(
   if (!res.ok) throw new Error(`Failed to send message: ${res.status}`)
   return res.json()
 }
+
+/** Upload WAV audio, get transcript + AI response. */
+export async function sendAudio(
+  config: BridgeConfig,
+  sessionId: string,
+  audioBlob: Blob,
+): Promise<{ transcript: string; response: AgentResponse }> {
+  const formData = new FormData()
+  formData.append('file', audioBlob, 'recording.wav')
+
+  const res = await fetch(`${config.url}/v1/sessions/${sessionId}/audio`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+    },
+    body: formData,
+  })
+  if (!res.ok) throw new Error(`Failed to send audio: ${res.status}`)
+  return res.json()
+}
