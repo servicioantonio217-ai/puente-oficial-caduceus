@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from g2_bridge.config import Settings
 
-bearer_scheme = HTTPBearer()
+bearer_scheme: HTTPBearer = HTTPBearer(auto_error=False)
 
 
 def verify_client_token(credentials: HTTPAuthorizationCredentials, settings: Settings) -> None:
@@ -32,9 +32,13 @@ class AuthError(Exception):
 
 async def get_authenticated_request(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = bearer_scheme,
+    credentials: HTTPAuthorizationCredentials | None = None,
 ) -> Request:
     """FastAPI dependency: validates client token and agent configuration."""
+    if credentials is None:
+        credentials = await bearer_scheme(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
     settings: Settings = request.app.state.settings
     verify_client_token(credentials, settings)
     verify_agent_configured(settings)

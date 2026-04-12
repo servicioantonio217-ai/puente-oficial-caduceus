@@ -28,10 +28,12 @@ async def send_message(
     request: Request, session_id: str, body: SendMessageRequest
 ) -> AgentResponse:
     """Send a text message to the AI Agent and return the adapted response."""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from fastapi.security import HTTPBearer
 
     # Auth
-    credentials: HTTPAuthorizationCredentials = await HTTPBearer()(request)
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
     settings = request.app.state.settings
     verify_client_token(credentials, settings)
     verify_agent_configured(settings)

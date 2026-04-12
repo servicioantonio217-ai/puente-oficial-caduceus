@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-from httpx import Response
+from httpx import Request, Response
 
 from g2_bridge.config import Settings
 from g2_bridge.models import AudioResponse
@@ -59,7 +59,8 @@ class TestSTTClient:
         settings = Settings(stt_api_url="http://localhost:8080/v1/audio/transcriptions")
         client = STTClient(settings)
 
-        mock_response = Response(500, text="Internal Server Error")
+        mock_request = Request("POST", "http://localhost:8080/v1/audio/transcriptions")
+        mock_response = Response(500, request=mock_request, text="Internal Server Error")
         client._client = AsyncMock()
         client._client.post = AsyncMock(return_value=mock_response)
 
