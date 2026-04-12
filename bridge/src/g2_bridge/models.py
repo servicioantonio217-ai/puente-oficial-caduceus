@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -117,7 +118,7 @@ class AgentResponse(BaseModel):
     status: str = "completed"
     conversation: str = ""
     output: list[OutputMessage] = []
-    usage: dict = Field(default_factory=lambda: {"input_tokens": 0, "output_tokens": 0})
+    usage: dict[str, Any] = Field(default_factory=lambda: {"input_tokens": 0, "output_tokens": 0})
 
 
 class HealthResponse(BaseModel):

@@ -28,9 +28,11 @@ async def create_session(
     request: Request, body: CreateSessionRequest | None = None
 ) -> SessionResponse:
     """Create a new chat session."""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from fastapi.security import HTTPBearer
 
-    credentials: HTTPAuthorizationCredentials = await HTTPBearer()(request)
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
     settings = request.app.state.settings
     verify_client_token(credentials, settings)
 
@@ -54,9 +56,11 @@ async def create_session(
 @router.get("", response_model=list[SessionResponse])
 async def list_sessions(request: Request) -> list[SessionResponse]:
     """List all sessions, ordered by most recently updated."""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from fastapi.security import HTTPBearer
 
-    credentials: HTTPAuthorizationCredentials = await HTTPBearer()(request)
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
     settings = request.app.state.settings
     verify_client_token(credentials, settings)
 
@@ -78,9 +82,11 @@ async def list_sessions(request: Request) -> list[SessionResponse]:
 @router.get("/{session_id}", response_model=SessionDetailResponse)
 async def get_session(request: Request, session_id: str) -> SessionDetailResponse:
     """Get session details including full message history."""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from fastapi.security import HTTPBearer
 
-    credentials: HTTPAuthorizationCredentials = await HTTPBearer()(request)
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
     settings = request.app.state.settings
     verify_client_token(credentials, settings)
 
@@ -112,9 +118,11 @@ async def get_session(request: Request, session_id: str) -> SessionDetailRespons
 @router.delete("/{session_id}", status_code=204)
 async def delete_session(request: Request, session_id: str) -> None:
     """Delete a session and all its messages."""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from fastapi.security import HTTPBearer
 
-    credentials: HTTPAuthorizationCredentials = await HTTPBearer()(request)
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
     settings = request.app.state.settings
     verify_client_token(credentials, settings)
 

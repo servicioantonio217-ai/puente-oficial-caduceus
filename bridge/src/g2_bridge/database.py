@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import aiosqlite
 
@@ -67,7 +68,7 @@ class Database:
         )
         await self.connection.commit()
 
-    async def list_sessions(self) -> list[dict]:
+    async def list_sessions(self) -> list[dict[str, Any]]:
         cursor = await self.connection.execute(
             "SELECT s.id, s.name, s.created_at, s.updated_at, "
             "COUNT(m.id) AS message_count "
@@ -77,7 +78,7 @@ class Database:
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
-    async def get_session(self, session_id: str) -> dict | None:
+    async def get_session(self, session_id: str) -> dict[str, Any] | None:
         cursor = await self.connection.execute(
             "SELECT s.id, s.name, s.created_at, s.updated_at, "
             "COUNT(m.id) AS message_count "
@@ -120,7 +121,7 @@ class Database:
         )
         await self.connection.commit()
 
-    async def get_messages(self, session_id: str) -> list[dict]:
+    async def get_messages(self, session_id: str) -> list[dict[str, Any]]:
         cursor = await self.connection.execute(
             "SELECT id, role, content, created_at FROM messages "
             "WHERE session_id = ? ORDER BY created_at ASC",

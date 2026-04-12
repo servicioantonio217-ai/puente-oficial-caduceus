@@ -27,10 +27,12 @@ def _now_iso() -> str:
 @router.post("/{session_id}/audio", response_model=AudioResponse)
 async def send_audio(request: Request, session_id: str, file: UploadFile) -> AudioResponse:
     """Receive WAV audio, transcribe via STT, forward transcript to AI Agent."""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from fastapi.security import HTTPBearer
 
     # Auth
-    credentials: HTTPAuthorizationCredentials = await HTTPBearer()(request)
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
     settings = request.app.state.settings
     verify_client_token(credentials, settings)
     verify_agent_configured(settings)

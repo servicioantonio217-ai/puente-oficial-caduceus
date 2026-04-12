@@ -52,7 +52,7 @@ class AgentClient:
             logger.error("Agent returned %d: %s", response.status_code, response.text)
             response.raise_for_status()
 
-        return response.json()
+        return dict(response.json())
 
     def parse_response(self, raw: dict[str, Any]) -> AgentResponse:
         """Parse raw agent response into our AgentResponse model."""
