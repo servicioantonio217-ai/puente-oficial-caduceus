@@ -107,7 +107,7 @@ export function AppGlasses() {
 
       return result
     },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
+    [],
   )
 
   const screenMapper = useCallback(() => {
