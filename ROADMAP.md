@@ -8,7 +8,7 @@ Each phase is self-contained and testable independently.
 
 ---
 
-## Phase 1: Bridge MVP (Text-only)
+## Phase 1: Bridge MVP (Text-only) ✅
 
 > Goal: Working text-based chat via Bridge → AI Agent. Testable with curl.
 
@@ -24,11 +24,11 @@ Each phase is self-contained and testable independently.
 - [x] `.gitlab-ci.yml` — lint (ruff), type check (mypy), unit tests (pytest), Podman build
 - [x] Basic README with setup instructions
 
-**Milestone:** `curl`-testable text chat loop + green CI pipeline. ✅
+**Milestone:** `curl`-testable text chat loop + green CI pipeline.
 
 ---
 
-## Phase 2: App Scaffold (Text-only)
+## Phase 2: App Scaffold (Text-only) ✅
 
 > Goal: Even Hub app with text chat on G2 glasses via Bridge. No voice yet.
 
@@ -36,70 +36,94 @@ Each phase is self-contained and testable independently.
 - [x] `app.json` manifest (permissions, metadata)
 - [x] Screen router setup (even-toolkit `createGlassScreenRouter`)
 - [x] Screens: Splash → Menu → Chat → Settings
-- [x] Bridge API client (fetch wrapper, token auth, SSE streaming)
+- [x] Bridge API client (fetch wrapper, token auth)
 - [x] Chat display (even-toolkit `buildChatDisplay` with prefixes)
 - [x] Menu screen (list: New Session, Sessions, Settings)
 - [x] Sessions screen (scrollable list of existing sessions)
 - [x] Settings screen (bridge URL + token input, save to SDK localStorage)
 - [x] Navigation between screens (scroll, tap, back)
 - [x] Exit mechanism (double-tap → system confirmation)
-- [ ] QR sideload dev workflow
 - [x] CI: extend `.gitlab-ci.yml` — lint (eslint), type check (tsc), build (vite)
 
-**Milestone:** Text chat on G2 glasses + green CI pipeline. Type on phone WebUI → see response on glasses. ✅ (pending QR sideload verification)
+**Milestone:** Text chat on G2 glasses + green CI pipeline. Type on phone WebUI → see response on glasses.
+
+**Note:** QR sideload dev workflow is a deployment concern (Phase 4), not a feature.
 
 ---
 
-## Phase 3: Voice Pipeline
+## Phase 3: Voice Pipeline 🚧
 
 > Goal: Speak into glasses → transcript → AI response → display on glasses.
 
-### Phone (App)
-- [ ] PCM audio capture from G2 glasses (even-toolkit + EvenAppBridge)
-- [ ] Voice Activity Detection (VAD) — detect silence end
-- [ ] PCM to WAV conversion (even-toolkit audio utils)
-- [ ] Recording screen ("Listening..." indicator on glasses)
-- [ ] Double-tap to start/stop recording
-- [ ] Auto-stop on VAD silence
-- [ ] Upload WAV to bridge: `POST /v1/sessions/{id}/audio`
-- [ ] Display transcript + response on glasses
-
 ### Bridge (Server)
+
 - [x] `POST /v1/sessions/{id}/audio` endpoint (receive WAV)
 - [x] STT client: POST to configurable endpoint (`/v1/audio/transcriptions`)
-- [ ] Whisper hallucination filtering
-- [x] Transcript → AI Agent → response pipeline
 - [x] Configurable STT endpoint + API key via env vars
+- [x] Transcript → AI Agent → response pipeline
+- [ ] Whisper hallucination filtering (low-priority — skip for MVP)
 
-**Milestone:** Full voice loop. Speak → read response on glasses. ✅ (pending hallucination filtering)
+### App (Phone)
+
+- [x] PCM audio capture via EvenAppBridge (`audio/even-bridge.ts`)
+- [x] Voice Activity Detection (VAD) — detect silence end (`audio/recorder.ts`)
+- [x] PCM to WAV conversion (Float32 → S16LE, 16kHz mono)
+- [ ] Recording screen ("Listening..." indicator on glasses)
+- [ ] Double-tap to start/stop recording (wire into chat screen)
+- [ ] Upload WAV to bridge: `POST /v1/sessions/{id}/audio`
+- [ ] Display transcript + response on glasses after voice input
+
+### Integration
+
+- [ ] E2E voice loop test: speak → see response on glasses
+- [ ] Voice recording + upload → bridge STT → AI → display
+
+**Milestone:** Full voice loop. Speak → read response on glasses.
 
 ---
 
-## Phase 4: Polish & OSS Readiness
+## Phase 4: Quality & OSS Readiness
 
-> Goal: Production-quality, publishable as open source.
+> Goal: Clean, tested, publishable as open source.
+
+### Repo Hygiene
+
+- [ ] Root `.gitignore` (node_modules, __pycache__, .mypy_cache, .pytest_cache, .ruff_cache, dist/)
+- [ ] Remove tracked artifacts (node_modules, cache dirs) from git history
+- [ ] Bridge `.gitignore` — verify completeness
+- [ ] App `.gitignore` — verify completeness
+
+### Testing
+
+- [ ] Bridge: increase coverage (edge cases, error paths, auth failures)
+- [ ] App: meaningful unit tests (replace trivial logic tests)
+- [ ] App: audio module tests (VAD, PCM→WAV conversion, recorder state machine)
+- [ ] Integration smoke test (bridge + app against each other, CI-level)
 
 ### Features
-- [ ] Response summarization mode (configurable LLM endpoint)
-- [ ] Phone companion WebUI (even-toolkit web components for settings)
-- [ ] Session resume (reconnect to existing AI agent conversation)
-- [ ] Session rename / delete from glasses UI
+
+- [ ] Session rename from glasses UI
+- [ ] Session delete from glasses UI
 - [ ] Error handling & reconnection (bridge offline, agent timeout, STT failure)
 - [ ] Idle resilience (no freeze after 2 min, foreground/background lifecycle)
-- [ ] Disconnect recovery (re-render on reconnect)
 
 ### Documentation
-- [ ] Project README (quickstart, architecture overview, screenshots)
+
+- [ ] Project README (quickstart, architecture overview)
 - [ ] Bridge README (setup, configuration reference, env vars)
 - [ ] App README (sideload, Even Hub submission, troubleshooting)
 - [ ] CONTRIBUTING.md (dev setup, code style, PR process)
-- [ ] LICENSE
+- [ ] Update ARCHITECTURE.md (project structure, file paths)
 
 ### Infrastructure
-- [ ] `.gitignore` (both bridge/ and app/)
-- [ ] Bridge Podman Compose example
+
+- [ ] Podman Compose example (bridge + STT proxy)
 - [ ] App `.ehpk` build workflow
-- [ ] CI: final pipeline — bridge lint/test/build + app lint/build + integration smoke test
+- [ ] QR sideload dev workflow documentation
+
+### Legal
+
+- [ ] LICENSE (choose: MIT, Apache-2.0)
 
 **Milestone:** Ready for GitHub/GitLab public release + Even Hub submission.
 
@@ -107,8 +131,7 @@ Each phase is self-contained and testable independently.
 
 ## Current Status
 
-- [x] Architecture document finalized
 - [x] Phase 1 — Bridge MVP
-- [x] Phase 2 — App Scaffold (pending QR sideload verification)
-- [ ] Phase 3 — Voice Pipeline
-- [ ] Phase 4 — Polish & OSS Readiness
+- [x] Phase 2 — App Scaffold
+- [ ] Phase 3 — Voice Pipeline (bridge done, app audio infra done, wiring pending)
+- [ ] Phase 4 — Quality & OSS Readiness
