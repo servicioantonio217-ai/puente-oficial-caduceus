@@ -57,7 +57,7 @@ bridge:container:
     - podman $PODMAN_OPTS build -t $CONTAINER_IMAGE -t $CI_REGISTRY_IMAGE/bridge:latest ./bridge
     - podman $PODMAN_OPTS push $CONTAINER_IMAGE
     - podman $PODMAN_OPTS push $CI_REGISTRY_IMAGE/bridge:latest
-    rules:
+  rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
