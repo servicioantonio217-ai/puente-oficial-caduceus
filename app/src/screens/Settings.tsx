@@ -7,10 +7,13 @@ export function Settings() {
   const { config, setConfig, connected, connect, disconnect } = useApp()
   const [url, setUrl] = useState(config.url)
   const [token, setToken] = useState(config.token)
+  const [saved, setSaved] = useState(false)
 
   const handleSave = () => {
     const newConfig: BridgeConfig = { url: url.trim(), token: token.trim() }
     setConfig(newConfig)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
   const handleConnect = async () => {
@@ -56,7 +59,7 @@ export function Settings() {
             onClick={handleConnect}
             disabled={!url.trim() || !token.trim()}
           >
-            {connected ? 'Disconnect' : 'Connect'}
+            {saved ? 'Saved ✓' : connected ? 'Disconnect' : 'Connect'}
           </Button>
         </div>
         {connected && (

@@ -11,22 +11,23 @@ export function AppGlasses() {
   const {
     connected, sessions, currentSession, messages,
     isLoading, isRecording, error,
+    glassScreen, setGlassScreen,
     newSession, openSession, sendText, startRecording, stopRecording,
   } = useApp()
 
-  // Derive screen from app state
+  // Screen is driven by glassScreen state (set by menu actions)
+  // except when a session is open — always show chat
   const deriveScreenName = useCallback((): ScreenName => {
-    if (!connected) return 'menu'
     if (currentSession) return 'chat'
-    return 'menu'
-  }, [connected, currentSession])
+    return glassScreen
+  }, [currentSession, glassScreen])
 
   const screen = deriveScreenName()
   const flashPhase = useFlashPhase(screen === 'menu')
 
-  const navigate = useCallback(() => {
-    // Navigation is driven by app state, not explicit navigation
-  }, [])
+  const navigate = useCallback((s: ScreenName) => {
+    setGlassScreen(s)
+  }, [setGlassScreen])
 
   // Build menu items
   const menuItems = useMemo(() => {
@@ -82,7 +83,7 @@ export function AppGlasses() {
 
   const getSnapshot = useCallback(() => snapshotRef.current, [snapshotRef])
 
-  const actions: AppActions = { navigate, openSession, newSession, sendMessage: sendText, toggleRecording: () => { if (isRecording) stopRecording(); else startRecording() } }
+  const actions: AppActions = { navigate, goBack: () => setGlassScreen('menu'), openSession, newSession, sendMessage: sendText, toggleRecording: () => { if (isRecording) stopRecording(); else startRecording() } }
   const ctxRef = useRef(actions)
   ctxRef.current = actions
 

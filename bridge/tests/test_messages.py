@@ -7,36 +7,32 @@ from unittest.mock import AsyncMock, patch
 HEADERS = {"Authorization": "Bearer test-client-token"}
 
 MOCK_AGENT_RESPONSE = {
-    "id": "resp_test123",
-    "status": "completed",
-    "conversation": "session-uuid",
-    "output": [
+    "id": "chatcmpl_test123",
+    "object": "chat.completion",
+    "choices": [
         {
-            "type": "message",
-            "role": "assistant",
-            "content": [{"type": "output_text", "text": "Hello from the AI agent!"}],
+            "index": 0,
+            "message": {"role": "assistant", "content": "Hello from the AI agent!"},
+            "finish_reason": "stop",
         }
     ],
-    "usage": {"input_tokens": 10, "output_tokens": 20},
+    "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
 }
 
 MOCK_AGENT_LONG_RESPONSE = {
-    "id": "resp_test456",
-    "status": "completed",
-    "conversation": "session-uuid",
-    "output": [
+    "id": "chatcmpl_test456",
+    "object": "chat.completion",
+    "choices": [
         {
-            "type": "message",
-            "role": "assistant",
-            "content": [
-                {
-                    "type": "output_text",
-                    "text": "This is a very long response. " * 50,
-                }
-            ],
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "This is a very long response. " * 50,
+            },
+            "finish_reason": "stop",
         }
     ],
-    "usage": {"input_tokens": 10, "output_tokens": 200},
+    "usage": {"prompt_tokens": 10, "completion_tokens": 200, "total_tokens": 210},
 }
 
 
