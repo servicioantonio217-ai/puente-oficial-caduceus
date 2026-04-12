@@ -68,12 +68,10 @@ export function AppGlasses() {
 
   const getSnapshot = useCallback(() => snapshotRef.current, [snapshotRef])
 
-  const navigate = useCallback((s: ScreenName) => {
-    // Navigate to home means "go back" — close current session view
-    if (s === 'home') {
-      // Sessions screen: just change screen, sessions list is still available
-    }
-    // The screen router handles the rest via deriveScreenName
+  // navigate is unused — screen transitions are handled explicitly by action handlers
+  // returning { ...nav, screen: 'targetScreen' }
+  const navigate = useCallback((_s: ScreenName) => {
+    // No-op: all screen changes go through action handler return values
   }, [])
 
   const goBack = useCallback(() => {

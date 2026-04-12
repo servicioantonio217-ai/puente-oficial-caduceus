@@ -16,6 +16,7 @@ const MAX_SESSIONS = 10
  * - buildScrollableList for session items with ▲/▼ indicators
  * - backLabel (‹ Back) shown at bottom (not selectable)
  * - GO_BACK returns to home screen via nav.screen change
+ * - Selecting a session explicitly switches to chat screen
  */
 export const sessionsScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
@@ -63,13 +64,13 @@ export const sessionsScreen: GlassScreen<AppSnapshot, AppActions> = {
       const sessions = snapshot.sessions.slice(0, MAX_SESSIONS)
       if (sessions[nav.highlightedIndex]) {
         ctx.openSession(sessions[nav.highlightedIndex])
-        // openSession sets currentSession, deriveScreenName will switch to 'chat'
+        // Explicitly switch to chat screen — don't rely on deriveScreen
+        return { ...nav, screen: 'chat', highlightedIndex: 0 }
       }
       return nav
     }
 
     if (action.type === 'GO_BACK') {
-      // Return to home screen via nav.screen change
       return { ...nav, screen: 'home', highlightedIndex: 0 }
     }
 

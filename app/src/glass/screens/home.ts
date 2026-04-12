@@ -15,6 +15,9 @@ const MENU_ITEMS = ['New Session', drillLabel('Sessions')] as const
  * - drillLabel (›) for navigable items
  * - fieldJoin for header metadata
  * - No split layout — pure text mode
+ *
+ * Screen transitions are explicit: actions return the target screen
+ * via nav.screen change (not via deriveScreen).
  */
 export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot) {
@@ -47,9 +50,9 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
       const idx = nav.highlightedIndex
       if (idx === 0) {
         ctx.newSession()
-        // newSession opens a session, deriveScreenName will switch to 'chat'
+        // Explicitly switch to chat screen — don't rely on deriveScreen
+        return { ...nav, screen: 'chat', highlightedIndex: 0 }
       } else if (idx === 1) {
-        // Navigate to sessions screen by changing nav.screen
         return { ...nav, screen: 'sessions', highlightedIndex: 0 }
       }
       return { ...nav, highlightedIndex: 0 }

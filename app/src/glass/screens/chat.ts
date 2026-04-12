@@ -11,7 +11,7 @@ import type { AppSnapshot, AppActions } from '../shared'
  * - buildChatDisplay for streaming AI output with ▲/▼ scroll
  * - buildStaticActionBar for recording toggle
  * - SELECT_HIGHLIGHTED toggles recording
- * - GO_BACK returns to home via nav.screen change
+ * - GO_BACK closes session and returns to home via nav.screen change
  */
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
@@ -39,9 +39,7 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
 
   action(action, nav, snapshot, ctx) {
     if (action.type === 'GO_BACK') {
-      // Return to home screen via nav.screen change
-      // Note: deriveScreenName may override this if currentSession is still set,
-      // but goBack should clear the session context
+      // Close the session context and explicitly return to home
       ctx.goBack()
       return { ...nav, screen: 'home', highlightedIndex: 0 }
     }
