@@ -1,0 +1,227 @@
+<mxfile host="app.diagrams.net" modified="2026-04-12T16:00:00.000Z" agent="hermes" version="24.0.0">
+  <diagram name="G2 Caduceus Glasses UI" id="glasses-ui">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1200" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="&lt;b&gt;G2 Caduceus — Glasses UI Layout&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="400" y="20" width="380" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================ -->
+        <!-- SCREEN 1: MENU (Startbildschirm)             -->
+        <!-- ============================================ -->
+        <mxCell id="menu_label" value="&lt;b&gt;MENU — Startbildschirm&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="50" y="70" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- G2 Display frame -->
+        <mxCell id="menu_display" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#555555;strokeWidth=2;arcSize=8;container=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="100" width="280" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Menu box frame -->
+        <mxCell id="menu_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#00ff00;strokeWidth=2;arcSize=12;container=1;dashed=0;" vertex="1" parent="1">
+          <mxGeometry x="75" y="130" width="230" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Menu items -->
+        <mxCell id="menu_item1" value="▶  New Session" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=13;fontStyle=1;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="90" y="140" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="menu_item2" value="   Sessions" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=13;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="90" y="165" width="100" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="menu_item3" value="   Settings" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=13;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="90" y="190" width="100" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- Note -->
+        <mxCell id="menu_note" value="Rahmen (╭╮╰╯│─) rundherum&#xa;▶ markiert selektiertes Item&#xa;Kein Logo, kein App-Name" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="350" y="120" width="200" height="70" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================ -->
+        <!-- SCREEN 2: SESSIONS                            -->
+        <!-- ============================================ -->
+        <mxCell id="sessions_label" value="&lt;b&gt;SESSIONS&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="50" y="280" width="100" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sessions_display" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#555555;strokeWidth=2;arcSize=8;container=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="310" width="280" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Header -->
+        <mxCell id="sessions_header" value="Sessions" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=13;fontStyle=1;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="65" y="318" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="sessions_sep" value="────────────────────────" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];strokeColor=none;fillColor=none;fontColor=#555555;fontSize=11;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="65" y="338" width="200" height="16" as="geometry" />
+        </mxCell>
+
+        <!-- Sessions box -->
+        <mxCell id="sessions_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#00ff00;strokeWidth=2;arcSize=12;container=1;" vertex="1" parent="1">
+          <mxGeometry x="65" y="355" width="250" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sess_item1" value="▶  Chat 1  (5)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=12;fontStyle=1;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="80" y="360" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_item2" value="   Chat 2  (12)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=12;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="80" y="380" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_item3" value="   Chat 3  (3)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=12;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="80" y="400" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_item4" value="   Chat 4  (1)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=12;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="80" y="420" width="110" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sessions_note" value="Header: &quot;Sessions&quot; + Trennlinie&#xa;Box mit Sessions, scrollbar&#xa;▶ = aktuell markiert" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="350" y="330" width="200" height="60" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================ -->
+        <!-- SCREEN 3: CHAT (leer)                        -->
+        <!-- ============================================ -->
+        <mxCell id="chat_empty_label" value="&lt;b&gt;CHAT (leer)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="500" y="70" width="120" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_empty_display" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#555555;strokeWidth=2;arcSize=8;container=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="100" width="280" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_empty_header" value="Chat: Chat 1          Scroll" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=12;fontStyle=1;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="515" y="108" width="220" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="chat_empty_sep" value="────────────────────────" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];strokeColor=none;fillColor=none;fontColor=#555555;fontSize=11;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="515" y="128" width="200" height="16" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_empty_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#00ff00;strokeWidth=2;arcSize=12;container=1;" vertex="1" parent="1">
+          <mxGeometry x="515" y="145" width="250" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_empty_text1" value="🎤 Tap to speak" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=13;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="560" y="170" width="150" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="chat_empty_text2" value="Use phone WebUI to type" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#888888;fontSize=11;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="560" y="200" width="180" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_empty_note" value="Header: Chat-Name + Action Bar&#xa;Box zentriert mit Hinweisen&#xa;Aufnahme-Indikator" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="800" y="120" width="200" height="60" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================ -->
+        <!-- SCREEN 4: CHAT (mit Inhalt)                  -->
+        <!-- ============================================ -->
+        <mxCell id="chat_full_label" value="&lt;b&gt;CHAT (mit Inhalt)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="500" y="280" width="170" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_full_display" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#555555;strokeWidth=2;arcSize=8;container=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="310" width="280" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_full_header" value="Chat: Chat 1          Scroll" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=12;fontStyle=1;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="515" y="318" width="220" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="chat_full_sep" value="────────────────────────" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];strokeColor=none;fillColor=none;fontColor=#555555;fontSize=11;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="515" y="338" width="200" height="16" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_full_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#00ff00;strokeWidth=2;arcSize=12;container=1;" vertex="1" parent="1">
+          <mxGeometry x="515" y="355" width="250" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_msg1" value="&gt; Hallo" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=12;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="530" y="362" width="70" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="chat_msg2" value="Hallo! Wie kann ich dir&#xa;helfen?" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=12;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="530" y="382" width="130" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="chat_msg3" value="&gt; Erklär mir Python" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=12;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="530" y="425" width="150" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat_full_note" value="Header: Chat-Name + Action Bar&#xa;Box mit Chat-Verlauf&#xa;&gt; = User, normal = Assistant&#xa;Auto-Scroll nach unten" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="800" y="330" width="200" height="80" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================ -->
+        <!-- SCREEN 5: SETTINGS                           -->
+        <!-- ============================================ -->
+        <mxCell id="settings_label" value="&lt;b&gt;SETTINGS&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="950" y="70" width="100" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="settings_display" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#555555;strokeWidth=2;arcSize=8;container=1;" vertex="1" parent="1">
+          <mxGeometry x="950" y="100" width="280" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="settings_header" value="Settings" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=13;fontStyle=1;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="965" y="108" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="settings_sep" value="────────────────────────" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];strokeColor=none;fillColor=none;fontColor=#555555;fontSize=11;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="965" y="128" width="200" height="16" as="geometry" />
+        </mxCell>
+
+        <mxCell id="settings_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#00ff00;strokeWidth=2;arcSize=12;container=1;" vertex="1" parent="1">
+          <mxGeometry x="965" y="145" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="settings_item1" value="▶  Connected" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#00ff00;fontSize=12;fontStyle=1;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="980" y="152" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="settings_item2" value="   Edit on phone WebUI" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#aaaaaa;fontSize=12;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="980" y="177" width="170" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="settings_note" value="Header: &quot;Settings&quot; + Trennlinie&#xa;Box mit Optionen&#xa;▶ = markiert" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="120" width="170" height="60" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================ -->
+        <!-- LEGEND                                       -->
+        <!-- ============================================ -->
+        <mxCell id="legend_label" value="&lt;b&gt;LEGENDE&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="950" y="280" width="90" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#cccccc;arcSize=8;container=1;" vertex="1" parent="1">
+          <mxGeometry x="950" y="310" width="280" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend1" value="&#xa0;&#xa0;&#xa0; = G2 Display (schwarzer Hintergrund)&#xa;╭╮╰╯│─ = Rahmen (gerundete Ecken)&#xa;──────── = Trennlinie nach Header&#xa;▶ = Selektiertes / markiertes Item&#xa;  &#xa0;= Normales (nicht markiertes) Item&#xa;&gt; = User-Nachricht im Chat&#xa;(kein Prefix) = Assistant-Antwort&#xa;🎵 = Aufnahme-Indikator" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontFamily=Courier New;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="960" y="318" width="260" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================ -->
+        <!-- NAVIGATION ARROWS                            -->
+        <!-- ============================================ -->
+        <mxCell id="nav1" value="" style="shape=mxgraph.arrows2.arrow;dy=0.6;dx=36;notch=0;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="165" y="265" width="50" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="nav2" value="" style="shape=mxgraph.arrows2.arrow;dy=0.6;dx=36;notch=0;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="615" y="265" width="50" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Back arrow from sessions to menu -->
+        <mxCell id="back1" value="" style="shape=mxgraph.arrows2.arrow;dy=0.6;dx=36;notch=0;whiteSpace=wrap;html=1;fillColor=#ffe6e6;strokeColor=#cc9999;direction=south;" vertex="1" parent="1">
+          <mxGeometry x="50" y="270" width="50" height="25" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

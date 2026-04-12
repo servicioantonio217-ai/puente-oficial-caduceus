@@ -52,7 +52,7 @@ Each phase is self-contained and testable independently.
 
 ---
 
-## Phase 3: Voice Pipeline 🚧
+## Phase 3: Voice Pipeline ✅
 
 > Goal: Speak into glasses → transcript → AI response → display on glasses.
 
@@ -62,30 +62,45 @@ Each phase is self-contained and testable independently.
 - [x] STT client: POST to configurable endpoint (`/v1/audio/transcriptions`)
 - [x] Configurable STT endpoint + API key via env vars
 - [x] Transcript → AI Agent → response pipeline
-- [ ] Whisper hallucination filtering (low-priority — skip for MVP)
+- [x] JSON response handling for STT providers (e.g. LiteLLM/Mistral returning JSON)
 
 ### App (Phone)
 
 - [x] PCM audio capture via EvenAppBridge (`audio/even-bridge.ts`)
 - [x] Voice Activity Detection (VAD) — detect silence end (`audio/recorder.ts`)
 - [x] PCM to WAV conversion (Float32 → S16LE, 16kHz mono)
-- [ ] Recording screen ("Listening..." indicator on glasses)
-- [ ] Double-tap to start/stop recording (wire into chat screen)
-- [ ] Upload WAV to bridge: `POST /v1/sessions/{id}/audio`
-- [ ] Display transcript + response on glasses after voice input
+- [x] Recording toggle via `SELECT_HIGHLIGHTED` in chat screen (🎤 Listening... / 🔴 Tap to stop)
+- [x] Upload WAV to bridge: `POST /v1/sessions/{id}/audio`
+- [x] Display transcript + response on glasses after voice input
+- [x] Full pipeline in AppContext (recording → WAV → bridge → transcript + response → messages)
 
 ### Integration
 
-- [ ] E2E voice loop test: speak → see response on glasses
-- [ ] Voice recording + upload → bridge STT → AI → display
+- [x] App wiring: chat.ts shows recording state, AppContext sends WAV to bridge
+- [ ] E2E voice loop test: speak → see response on glasses (requires real hardware)
+- [ ] Whisper hallucination filtering (low-priority — skip for MVP)
 
 **Milestone:** Full voice loop. Speak → read response on glasses.
 
 ---
 
-## Phase 4: Quality & OSS Readiness
+## Phase 4: Quality & OSS Readiness 🚧
 
 > Goal: Clean, tested, publishable as open source.
+
+### UI Redesign (branch: `feat/glasses-ui-redesign`)
+
+- [x] Design system: split-panel layout, green (#97D077) accent, no box-drawing for menu items
+- [x] Splash screen: bridge-connection-gated, pixel spinner, min 2s
+- [x] Menu L0: persistent left panel, selected item with green border highlight
+- [ ] Split-panel implementation (left menu ~160px + right content ~180px)
+- [ ] Sessions screen: ListContainer with native scrolling, scroll bar when overflow
+- [ ] Session list items: name + timestamp (default) OR first message preview (setting toggle)
+- [ ] Chat screen: full-screen TextContainer, scrollable, last few messages
+- [ ] Voice input always available in chat (not conditional on follow-up questions)
+- [ ] Follow-up question buttons (max 3-5): TBD — depends on Responses API support
+- [ ] Settings screen: split-panel, right side shows settings details
+- [ ] New Session: opens chat in full screen
 
 ### Repo Hygiene
 
@@ -134,5 +149,5 @@ Each phase is self-contained and testable independently.
 
 - [x] Phase 1 — Bridge MVP
 - [x] Phase 2 — App Scaffold
-- [ ] Phase 3 — Voice Pipeline (bridge done, app audio infra done, wiring pending)
-- [ ] Phase 4 — Quality & OSS Readiness
+- [x] Phase 3 — Voice Pipeline (bridge + app wiring done, E2E hardware test pending)
+- [ ] Phase 4 — Quality & OSS Readiness (UI redesign in progress)

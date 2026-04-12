@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router'
 import { useApp } from '../contexts/AppContext'
+import type { Session } from '../types'
 import { Button } from 'even-toolkit/web'
 import { IcPlus } from 'even-toolkit/web/icons/svg-icons'
 
@@ -12,7 +13,7 @@ export function SessionsScreen() {
     navigate('/')
   }
 
-  const handleOpen = (session: { id: string; name?: string; message_count?: number }) => {
+  const handleOpen = (session: Session) => {
     openSession(session)
     navigate('/')
   }

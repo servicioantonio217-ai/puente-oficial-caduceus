@@ -1,44 +1,33 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
-import { buildChatDisplay } from 'even-toolkit/glass-chat-display'
-import { line } from 'even-toolkit/types'
 import { calcMaxScroll } from 'even-toolkit/glass-nav'
+import { buildChatDisplay } from 'even-toolkit/glass-chat-display'
 import type { AppSnapshot, AppActions } from '../shared'
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
-  display(snapshot, _nav) {
+  display(snapshot, nav) {
     const title = snapshot.currentSession?.name
-      ? `Chat: ${snapshot.currentSession.name}`
+      ? snapshot.currentSession.name
       : 'Chat'
 
-    if (snapshot.chatLines.length === 0) {
-      return {
-        lines: [
-          line(title),
-          line(''),
-          line(snapshot.isRecording ? '🎤 Listening...' : 'Tap to speak'),
-          line(''),
-          line('Use phone WebUI to type'),
-        ],
-      }
-    }
+    const actionBar = snapshot.isRecording ? '🔴 Tap to stop' : '🎤 Tap to speak'
+
+    const lines = snapshot.chatLines.length > 0
+      ? snapshot.chatLines
+      : [{ type: 'system' as const, text: 'Tap to speak' }]
 
     return buildChatDisplay({
       title,
-      actionBar: snapshot.isRecording ? '🔴 Tap to stop' : 'Scroll',
-      chatLines: snapshot.chatLines,
-      scrollOffset: 0,
-      contentSlots: 7,
-      maxChars: 44,
+      actionBar,
+      chatLines: lines,
+      scrollOffset: nav.highlightedIndex,
     })
   },
 
   action(action, nav, snapshot, ctx) {
-    // Back from chat to menu
-    if (action.type === 'NAV_BACK') {
+    if (action.type === 'GO_BACK') {
       ctx.goBack()
       return nav
     }
-    // Tap to start/stop recording
     if (action.type === 'SELECT_HIGHLIGHTED') {
       ctx.toggleRecording()
       return nav
@@ -47,11 +36,7 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     if (action.type === 'HIGHLIGHT_MOVE') {
       const maxScroll = calcMaxScroll(snapshot.chatLines.length, 7)
       const delta = action.direction === 'up' ? 1 : -1
-      // We encode scroll offset in highlightedIndex since GlassNavState
-      // only has highlightedIndex and screen. This is a workaround —
-      // the chat screen re-uses highlightedIndex as scroll offset.
-      const current = nav.highlightedIndex
-      const next = current + delta
+      const next = nav.highlightedIndex + delta
       return { ...nav, highlightedIndex: Math.max(0, Math.min(maxScroll, next)) }
     }
     return nav
