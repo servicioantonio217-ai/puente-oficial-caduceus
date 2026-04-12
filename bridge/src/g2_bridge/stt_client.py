@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 import httpx
@@ -32,9 +33,12 @@ class STTClient:
 
         Uses the Whisper API format:
         POST /audio/transcriptions with multipart form: file + model.
+
+        Handles both plain text and JSON response formats (some providers
+        return JSON even when response_format=text is requested).
         """
         files = {"file": (filename, audio_data, "audio/wav")}
-        data = {"model": "whisper-1", "response_format": "text"}
+        data = {"model": self.settings.stt_model, "response_format": "text"}
 
         logger.info("Sending audio to STT (%d bytes)", len(audio_data))
         response = await self._client.post(
@@ -47,6 +51,19 @@ class STTClient:
             logger.error("STT returned %d: %s", response.status_code, response.text)
             response.raise_for_status()
 
-        transcript = response.text.strip()
+        raw = response.text.strip()
+
+        # Some providers return JSON even with response_format=text
+        # Try to parse and extract the text field
+        if raw.startswith("{"):
+            try:
+                parsed = json.loads(raw)
+                transcript = parsed.get("text", "")
+            except json.JSONDecodeError:
+                transcript = raw
+        else:
+            transcript = raw
+
+        transcript = transcript.strip()
         logger.info("STT transcript: %s", transcript[:100])
         return transcript
