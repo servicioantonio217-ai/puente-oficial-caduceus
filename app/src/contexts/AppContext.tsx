@@ -23,13 +23,11 @@ interface AppContextValue {
   isLoading: boolean
   isRecording: boolean
   error: string | null
-  /** Current home panel: 'none' = menu only, 'sessions' | 'settings' = sub-panel */
-  homePanel: 'none' | 'sessions' | 'settings'
-  setHomePanel: (panel: 'none' | 'sessions' | 'settings') => void
   connect: () => Promise<void>
   disconnect: () => void
   refreshSessions: () => Promise<void>
   openSession: (session: Session) => Promise<void>
+  closeSession: () => void
   newSession: (name?: string) => Promise<void>
   removeSession: (id: string) => Promise<void>
   sendText: (content: string) => Promise<void>
@@ -48,7 +46,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [homePanel, setHomePanel] = useState<'none' | 'sessions' | 'settings'>('none')
 
   const configRef = useRef(config)
   configRef.current = config
@@ -113,6 +110,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /** Close current session — return to home without disconnecting. */
+  const closeSession = useCallback(() => {
+    setCurrentSession(null)
+    setMessages([])
+  }, [])
+
   const newSession = useCallback(async (name?: string) => {
     setIsLoading(true)
     setError(null)
@@ -135,7 +138,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (currentSession?.id === id) {
         setCurrentSession(null)
         setMessages([])
-        setHomePanel('none')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete session')
@@ -275,9 +277,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         connected, sessions,
         currentSession, messages,
         isLoading, isRecording, error,
-        homePanel, setHomePanel,
         connect, disconnect,
-        refreshSessions, openSession,
+        refreshSessions, openSession, closeSession,
         newSession, removeSession,
         sendText, startRecording, stopRecording,
       }}
