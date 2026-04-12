@@ -65,13 +65,13 @@ Each phase is self-contained and testable independently.
 - [ ] Display transcript + response on glasses
 
 ### Bridge (Server)
-- [ ] `POST /v1/sessions/{id}/audio` endpoint (receive WAV)
-- [ ] STT client: POST to configurable endpoint (`/v1/audio/transcriptions`)
+- [x] `POST /v1/sessions/{id}/audio` endpoint (receive WAV)
+- [x] STT client: POST to configurable endpoint (`/v1/audio/transcriptions`)
 - [ ] Whisper hallucination filtering
-- [ ] Transcript → AI Agent → response pipeline
-- [ ] Configurable STT endpoint + API key via env vars
+- [x] Transcript → AI Agent → response pipeline
+- [x] Configurable STT endpoint + API key via env vars
 
-**Milestone:** Full voice loop. Speak → read response on glasses.
+**Milestone:** Full voice loop. Speak → read response on glasses. ✅ (pending hallucination filtering)
 
 ---
 

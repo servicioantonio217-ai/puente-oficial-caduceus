@@ -15,7 +15,7 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
         lines: [
           line(title),
           line(''),
-          line('Send a message to begin'),
+          line(snapshot.isRecording ? '🎤 Listening...' : 'Tap to speak'),
           line(''),
           line('Use phone WebUI to type'),
         ],
@@ -24,7 +24,7 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
 
     return buildChatDisplay({
       title,
-      actionBar: 'Scroll',
+      actionBar: snapshot.isRecording ? '🔴 Tap to stop' : 'Scroll',
       chatLines: snapshot.chatLines,
       scrollOffset: 0,
       contentSlots: 7,
@@ -32,7 +32,13 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     })
   },
 
-  action(action, nav, snapshot) {
+  action(action, nav, snapshot, ctx) {
+    // Tap to start/stop recording
+    if (action.type === 'SELECT_HIGHLIGHTED') {
+      ctx.toggleRecording()
+      return nav
+    }
+
     if (action.type === 'HIGHLIGHT_MOVE') {
       const maxScroll = calcMaxScroll(snapshot.chatLines.length, 7)
       const delta = action.direction === 'up' ? 1 : -1

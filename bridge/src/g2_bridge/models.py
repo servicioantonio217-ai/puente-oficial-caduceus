@@ -92,6 +92,12 @@ class SendMessageRequest(BaseModel):
     content: str
 
 
+class AudioResponse(BaseModel):
+    """Response for audio transcription + AI reply."""
+    transcript: str
+    response: AgentResponse
+
+
 class OutputTextContent(BaseModel):
     type: str = "output_text"
     text: str

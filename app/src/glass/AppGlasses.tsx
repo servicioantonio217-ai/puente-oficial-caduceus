@@ -10,8 +10,8 @@ import { useApp } from '../contexts/AppContext'
 export function AppGlasses() {
   const {
     connected, sessions, currentSession, messages,
-    isLoading, error,
-    newSession, openSession, sendText,
+    isLoading, isRecording, error,
+    newSession, openSession, sendText, startRecording, stopRecording,
   } = useApp()
 
   // Derive screen from app state
@@ -56,11 +56,14 @@ export function AppGlasses() {
 
   // Add loading indicator
   const allChatLines = useMemo(() => {
+    if (isRecording) {
+      return [...chatLines, { type: 'thinking-collapsed' as const, text: 'Listening...' }]
+    }
     if (isLoading) {
       return [...chatLines, { type: 'thinking-collapsed' as const, text: 'Thinking...' }]
     }
     return chatLines
-  }, [chatLines, isLoading])
+  }, [chatLines, isLoading, isRecording])
 
   const snapshot: AppSnapshot = {
     screen,
@@ -71,6 +74,7 @@ export function AppGlasses() {
     menuItems,
     sessionItems,
     flashPhase,
+    isRecording,
   }
 
   const snapshotRef = useMemo(() => ({ current: snapshot }), []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -78,7 +82,7 @@ export function AppGlasses() {
 
   const getSnapshot = useCallback(() => snapshotRef.current, [snapshotRef])
 
-  const actions: AppActions = { navigate, openSession, newSession, sendMessage: sendText }
+  const actions: AppActions = { navigate, openSession, newSession, sendMessage: sendText, toggleRecording: () => { isRecording ? stopRecording() : startRecording() } }
   const ctxRef = useRef(actions)
   ctxRef.current = actions
 
