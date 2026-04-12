@@ -21,9 +21,10 @@ Each phase is self-contained and testable independently.
 - [ ] Response truncation (hard character limit, clean sentence boundary)
 - [ ] Health endpoint (`GET /health`)
 - [ ] Dockerfile
+- [ ] `.gitlab-ci.yml` — lint (ruff), type check (mypy), unit tests (pytest), Docker build
 - [ ] Basic README with setup instructions
 
-**Milestone:** `curl`-testable text chat loop.
+**Milestone:** `curl`-testable text chat loop + green CI pipeline.
 
 ---
 
@@ -43,8 +44,9 @@ Each phase is self-contained and testable independently.
 - [ ] Navigation between screens (scroll, tap, back)
 - [ ] Exit mechanism (double-tap → system confirmation)
 - [ ] QR sideload dev workflow
+- [ ] CI: extend `.gitlab-ci.yml` — lint (eslint), type check (tsc), build (vite)
 
-**Milestone:** Text chat on G2 glasses. Type on phone WebUI → see response on glasses.
+**Milestone:** Text chat on G2 glasses + green CI pipeline. Type on phone WebUI → see response on glasses.
 
 ---
 
@@ -95,8 +97,9 @@ Each phase is self-contained and testable independently.
 
 ### Infrastructure
 - [ ] `.gitignore` (both bridge/ and app/)
-- [ ] Bridge Docker Compose example
+- [ ] Bridge Podman Compose example
 - [ ] App `.ehpk` build workflow
+- [ ] CI: final pipeline — bridge lint/test/build + app lint/build + integration smoke test
 
 **Milestone:** Ready for GitHub/GitLab public release + Even Hub submission.
 

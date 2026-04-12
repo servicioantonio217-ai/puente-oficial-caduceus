@@ -1,0 +1,59 @@
+stages:
+  - lint
+  - typecheck
+  - test
+  - build
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+
+# --- Bridge (Python) ---
+
+bridge:lint:
+  stage: lint
+  image: python:3.11-slim
+  before_script:
+    - pip install ruff
+  script:
+    - cd bridge
+    - ruff check src/ tests/
+    - ruff format --check src/ tests/
+
+bridge:typecheck:
+  stage: typecheck
+  image: python:3.11-slim
+  before_script:
+    - pip install -e ".[dev]" > /dev/null
+  script:
+    - cd bridge
+    - mypy src/
+  allow_failure: true  # Strict mode — fix incrementally
+
+bridge:test:
+  stage: test
+  image: python:3.11-slim
+  before_script:
+    - pip install -e ".[dev]" > /dev/null
+  script:
+    - cd bridge
+    - pytest tests/ -v
+
+bridge:container:
+  stage: build
+  image: quay.io/podman/stable:latest
+  variables:
+    CONTAINER_IMAGE: $CI_REGISTRY_IMAGE/bridge:$CI_COMMIT_SHA
+    PODMAN_OPTS: --storage-driver=vfs --root /var/lib/containers/storage
+  before_script:
+    - podman $PODMAN_OPTS login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - podman $PODMAN_OPTS build -t $CONTAINER_IMAGE -t $CI_REGISTRY_IMAGE/bridge:latest ./bridge
+    - podman $PODMAN_OPTS push $CONTAINER_IMAGE
+    - podman $PODMAN_OPTS push $CI_REGISTRY_IMAGE/bridge:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
