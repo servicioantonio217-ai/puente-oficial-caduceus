@@ -20,8 +20,7 @@ const MAX_SESSIONS = 10
  */
 export const sessionsScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    const sessionCount = snapshot.sessions.length
-    const title = `Sessions (${sessionCount})`
+    const title = 'Sessions'
 
     // Build session items: name + formatted timestamp
     const sessionItems = snapshot.sessions.slice(0, MAX_SESSIONS).map((s) => {

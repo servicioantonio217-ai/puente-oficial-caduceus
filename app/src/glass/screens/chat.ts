@@ -7,9 +7,9 @@ import type { AppSnapshot, AppActions } from '../shared'
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Header: "State: idle · 5" — state on the left, message count on the right.
- *   States: idle, recording, thinking, offline
- * No action bar — header says it all, 8 content lines instead of 7.
+ * Header format: "○ idle · 5 msgs"
+ *   Symbols: ○ idle, ● listening, ~ thinking, — offline
+ *   Counter: message count with "msgs" label
  *
  * Layout (10 lines):
  *   Header + separator (2 lines, always visible)
@@ -23,14 +23,14 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
     const msgCount = snapshot.chatLines.length
 
-    // Header: state label + message count
-    let stateLabel: string
-    if (!snapshot.connected) stateLabel = 'offline'
-    else if (snapshot.isRecording) stateLabel = 'recording'
-    else if (snapshot.isProcessing) stateLabel = 'thinking'
-    else stateLabel = 'idle'
+    // Status symbol + label
+    let status: string
+    if (!snapshot.connected) status = '— offline'
+    else if (snapshot.isRecording) status = '● listening'
+    else if (snapshot.isProcessing) status = '~ thinking'
+    else status = '○ idle'
 
-    const title = fieldJoin(`State: ${stateLabel}`, String(msgCount))
+    const title = fieldJoin(status, `${msgCount} msgs`)
 
     // Empty state — clean, no prefix (type 'text' = no prefix in even-toolkit)
     const lines = msgCount > 0
