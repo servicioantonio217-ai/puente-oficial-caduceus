@@ -30,9 +30,9 @@ bridge:typecheck:
   stage: typecheck
   image: python:3.11-slim
   before_script:
+    - cd bridge
     - pip install -e ".[dev]" > /dev/null
   script:
-    - cd bridge
     - mypy src/
   allow_failure: true  # Strict mode — fix incrementally
 
@@ -40,9 +40,9 @@ bridge:test:
   stage: test
   image: python:3.11-slim
   before_script:
+    - cd bridge
     - pip install -e ".[dev]" > /dev/null
   script:
-    - cd bridge
     - pytest tests/ -v
 
 bridge:container:
