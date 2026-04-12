@@ -8,20 +8,9 @@ import type { AppSnapshot, AppActions } from '../shared'
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Visual language ("Signal" design):
- *   ● filled  = live, active, now
- *   ○ hollow  = waiting, processing
- *   > arrow   = outgoing (user)
- *     indent  = incoming (assistant)
- *   ! alert   = error
- *   · dot     = meta / separator
- *   — dash    = inactive / blocked
- *
- * Header states:
- *   Idle:            Caduceus · 5               ● Record
- *   Recording:       Caduceus ● REC · 5         ■ Stop
- *   AI processing:   Caduceus · 5               ○ thinking
- *   Disconnected:    Caduceus · 5               — offline
+ * Header: "State: idle · 5" — state on the left, message count on the right.
+ *   States: idle, recording, thinking, offline
+ * Action bar: ● Record / ■ Stop / ○ thinking / — offline
  *
  * Layout (10 lines):
  *   Header + separator (3 lines, always visible)
@@ -34,40 +23,30 @@ const CONTENT_SLOTS = 7
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    const name = snapshot.currentSession?.name ?? 'Caduceus'
     const msgCount = snapshot.chatLines.length
 
-    // Header: status indicator only when active, never "idle"
-    // ● REC = recording live, nothing = idle (absence is the signal)
-    const statusPart = snapshot.isRecording
-      ? `● REC · ${msgCount}`
-      : `${msgCount}`
+    // Header: state label + message count
+    let stateLabel: string
+    if (!snapshot.connected) stateLabel = 'offline'
+    else if (snapshot.isRecording) stateLabel = 'recording'
+    else if (snapshot.isProcessing) stateLabel = 'thinking'
+    else stateLabel = 'idle'
 
-    const title = fieldJoin(name, statusPart)
+    const title = fieldJoin(`State: ${stateLabel}`, String(msgCount))
 
-    // Action bar: one of four states, consistent symbol family
+    // Action bar: context-dependent
     let actionLabel: string
-    if (!snapshot.connected) {
-      actionLabel = '— offline'
-    } else if (snapshot.isRecording) {
-      actionLabel = '■ Stop'
-    } else if (snapshot.isProcessing) {
-      actionLabel = '○ thinking'
-    } else {
-      actionLabel = '● Record'
-    }
+    if (!snapshot.connected) actionLabel = '— offline'
+    else if (snapshot.isRecording) actionLabel = '■ Stop'
+    else if (snapshot.isProcessing) actionLabel = '○ thinking'
+    else actionLabel = '● Record'
 
     const actionBar = buildStaticActionBar([actionLabel], 0)
 
-    // Empty state — short, actionable
-    const lines = snapshot.chatLines.length > 0
+    // Empty state — clean, minimal
+    const lines = msgCount > 0
       ? snapshot.chatLines
-      : [{
-          type: 'system' as const,
-          text: snapshot.connected
-            ? 'Ready — tap ● Record'
-            : 'No connection',
-        }]
+      : [{ type: 'system' as const, text: '[ Tap to record ]' }]
 
     return buildChatDisplay({
       title,

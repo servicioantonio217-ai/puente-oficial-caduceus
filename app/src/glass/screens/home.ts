@@ -1,11 +1,11 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { buildScrollableList } from 'even-toolkit/glass-display-builders'
 import { moveHighlight } from 'even-toolkit/glass-nav'
-import { drillLabel, fieldJoin } from 'even-toolkit/glass-format'
+import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
 
 /** Menu items for the home screen */
-const MENU_ITEMS = ['New Session', drillLabel('Sessions')] as const
+const MENU_ITEMS = ['New Session', 'Sessions'] as const
 
 /**
  * Home screen — single-pane scrollable list.
