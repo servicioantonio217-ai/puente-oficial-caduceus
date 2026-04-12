@@ -94,6 +94,7 @@ class SendMessageRequest(BaseModel):
 
 class AudioResponse(BaseModel):
     """Response for audio transcription + AI reply."""
+
     transcript: str
     response: AgentResponse
 

@@ -25,9 +25,7 @@ def _now_iso() -> str:
 
 
 @router.post("/{session_id}/audio", response_model=AudioResponse)
-async def send_audio(
-    request: Request, session_id: str, file: UploadFile
-) -> AudioResponse:
+async def send_audio(request: Request, session_id: str, file: UploadFile) -> AudioResponse:
     """Receive WAV audio, transcribe via STT, forward transcript to AI Agent."""
     from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
