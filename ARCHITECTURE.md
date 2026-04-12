@@ -290,14 +290,14 @@ g2-caduceus/
 ### Bridge Server
 
 ```bash
-# Option 1: Docker
-docker build -t g2-bridge ./bridge
-docker run -d \
+# Option 1: Podman
+podman build -t g2-bridge ./bridge
+podman run -d \
   -p 8643:8000 \
-  -e AGENT_API_URL=http://localhost:8642/v1 \
-  -e AGENT_API_KEY=*** \
-  -e STT_API_URL=http://litellm:4000/v1/audio/transcriptions \
-  -e STT_API_KEY=*** \
+  -e G2_AGENT_API_URL=http://localhost:8642/v1 \
+  -e G2_AGENT_API_KEY=*** \
+  -e G2_STT_API_URL=http://litellm:4000/v1/audio/transcriptions \
+  -e G2_STT_API_KEY=*** \
   -e G2_BRIDGE_TOKEN=*** \
   -v g2-data:/data \
   g2-bridge

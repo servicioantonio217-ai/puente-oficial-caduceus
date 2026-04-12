@@ -97,7 +97,7 @@ Each phase is self-contained and testable independently.
 
 ### Infrastructure
 - [ ] `.gitignore` (both bridge/ and app/)
-- [ ] Bridge Docker Compose example
+- [ ] Bridge Podman Compose example
 - [ ] App `.ehpk` build workflow
 - [ ] CI: final pipeline — bridge lint/test/build + app lint/build + integration smoke test
 

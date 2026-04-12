@@ -4,14 +4,14 @@ Bridge server connecting Even Realities G2 smart glasses to AI agents.
 
 ## Quickstart
 
-### Docker
+### Podman
 
 ```bash
-docker build -t g2-bridge ./bridge
-docker run -d \
+podman build -t g2-bridge ./bridge
+podman run -d \
   -p 8643:8000 \
-  -e G2_BRIDGE_TOKEN=your-client-token \
-  -e G2_AGENT_API_KEY=your-agent-key \
+  -e G2_BRIDGE_TOKEN=*** \
+  -e G2_AGENT_API_KEY=*** \
   -e G2_AGENT_API_URL=http://localhost:8642/v1 \
   -v g2-data:/data \
   g2-bridge
