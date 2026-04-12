@@ -1,7 +1,6 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { calcMaxScroll } from 'even-toolkit/glass-nav'
 import { buildChatDisplay } from 'even-toolkit/glass-chat-display'
-import { buildStaticActionBar } from 'even-toolkit/action-bar'
 import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
 
@@ -10,16 +9,15 @@ import type { AppSnapshot, AppActions } from '../shared'
  *
  * Header: "State: idle · 5" — state on the left, message count on the right.
  *   States: idle, recording, thinking, offline
- * Action bar: ● Record / ■ Stop / ○ thinking / — offline
+ * No action bar — header says it all, 8 content lines instead of 7.
  *
  * Layout (10 lines):
- *   Header + separator (3 lines, always visible)
- *   Content area (7 lines, scrollable)
- *   Action bar (inline in header line)
+ *   Header + separator (2 lines, always visible)
+ *   Content area (8 lines, scrollable)
  */
 
-/** Visible content lines (10 total - 3 header lines) */
-const CONTENT_SLOTS = 7
+/** Visible content lines (10 total - 2 header lines) */
+const CONTENT_SLOTS = 8
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
@@ -34,23 +32,13 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
 
     const title = fieldJoin(`State: ${stateLabel}`, String(msgCount))
 
-    // Action bar: context-dependent
-    let actionLabel: string
-    if (!snapshot.connected) actionLabel = '— offline'
-    else if (snapshot.isRecording) actionLabel = '■ Stop'
-    else if (snapshot.isProcessing) actionLabel = '○ thinking'
-    else actionLabel = '● Record'
-
-    const actionBar = buildStaticActionBar([actionLabel], 0)
-
-    // Empty state — clean, minimal
+    // Empty state — clean, no prefix (type 'text' = no prefix in even-toolkit)
     const lines = msgCount > 0
       ? snapshot.chatLines
-      : [{ type: 'system' as const, text: '[ Tap to record ]' }]
+      : [{ type: 'text' as const, text: '[ Tap to record ]' }]
 
     return buildChatDisplay({
       title,
-      actionBar,
       chatLines: lines,
       scrollOffset: nav.highlightedIndex,
       contentSlots: CONTENT_SLOTS,
