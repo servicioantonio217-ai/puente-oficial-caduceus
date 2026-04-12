@@ -76,10 +76,10 @@ Each phase is self-contained and testable independently.
 ### Integration
 
 - [x] App wiring: chat.ts shows recording state, AppContext sends WAV to bridge
-- [ ] E2E voice loop test: speak → see response on glasses (requires real hardware)
-- [ ] Whisper hallucination filtering (low-priority — skip for MVP)
 
 **Milestone:** Full voice loop. Speak → read response on glasses.
+
+> **Note:** E2E voice loop testing on real hardware and Whisper hallucination filtering deferred to Phase 5 or post-release — both require physical G2 glasses and are not blocking for OSS readiness.
 
 ---
 
@@ -96,7 +96,6 @@ Each phase is self-contained and testable independently.
 - [x] Splash screen: disabled (undefined, no pixel spinner)
 - [x] Plain text status labels (Idle, Listening, Thinking, Offline)
 - [x] Follow even-toolkit patterns: `display()` + `action()` per screen, `nav.screen` for transitions
-- [ ] E2E voice loop test on real hardware
 - [ ] Error handling & reconnection (bridge offline, agent timeout, STT failure)
 - [ ] Idle resilience (no freeze after 2 min, foreground/background lifecycle)
 
@@ -105,38 +104,36 @@ Each phase is self-contained and testable independently.
 - [x] Root `.gitignore` (pycache, caches, IDE, env, db, node_modules)
 - [x] Bridge `.gitignore`
 - [x] App `.gitignore` (tsbuildinfo, vite.config.js/d.ts)
-- [ ] Verify no stale artifacts in git history (optional — `git filter-repo`)
 
 ### Testing
 
 - [ ] Bridge: increase coverage (edge cases, error paths, auth failures)
-- [ ] App: meaningful unit tests (replace trivial logic tests)
-- [ ] App: audio module tests (VAD, PCM→WAV conversion, recorder state machine)
+- [ ] App: audio module edge-case tests
 - [ ] Integration smoke test (bridge + app against each other, CI-level)
 
 ### Features
 
 - [ ] Session rename from WebUI
-- [ ] Session delete from WebUI (already works, needs glasses confirmation UX)
-- [ ] TTS for AI responses (text-to-speech on glasses, if supported)
+- [x] Session delete from WebUI (works, needs glasses confirmation UX)
+- [ ] TTS for AI responses (phone/Bluetooth headset — G2 has no speaker)
 
 ### Documentation
 
-- [ ] Project README (quickstart, architecture overview)
-- [ ] Bridge README (setup, configuration reference, env vars)
-- [ ] App README (sideload, Even Hub submission, troubleshooting)
-- [ ] CONTRIBUTING.md (dev setup, code style, PR process)
-- [ ] Update ARCHITECTURE.md (remove stale Settings screen references)
+- [x] Project README (quickstart, architecture overview)
+- [x] Bridge README (setup, configuration reference, env vars)
+- [x] App README (sideload, Even Hub submission, troubleshooting)
+- [x] CONTRIBUTING.md (dev setup, code style, PR process)
+- [ ] Update ARCHITECTURE.md (remove stale references)
 
 ### Infrastructure
 
-- [ ] Podman Compose example (bridge + STT proxy)
-- [ ] App `.ehpk` build workflow
+- [x] Podman Compose example (bridge + STT proxy)
+- [ ] App `.ehpk` build workflow (CI)
 - [ ] QR sideload dev workflow documentation
 
 ### Legal
 
-- [ ] LICENSE (choose: MIT, Apache-2.0)
+- [x] LICENSE (MIT)
 
 **Milestone:** Ready for GitHub/GitLab public release + Even Hub submission.
 
@@ -147,4 +144,4 @@ Each phase is self-contained and testable independently.
 - [x] Phase 1 — Bridge MVP
 - [x] Phase 2 — App Scaffold
 - [x] Phase 3 — Voice Pipeline (bridge + app wiring done, E2E hardware test pending)
-- [ ] Phase 4 — Quality & OSS Readiness (repo hygiene done, testing + docs pending)
+- [ ] Phase 4 — Quality & OSS Readiness (docs, license, compose done; testing + infra pending)

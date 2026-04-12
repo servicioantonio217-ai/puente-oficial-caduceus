@@ -22,8 +22,8 @@ podman run -d \
 ```bash
 cd bridge
 pip install -e .
-G2_BRIDGE_TOKEN=dev-token G2_AGENT_API_KEY=dev-key \
-  uvicorn g2_bridge.main:app --reload --port 8000
+G2_BRIDGE_TOKEN=*** G2_AGENT_API_KEY=*** \
+  python -m uvicorn g2_bridge.main:app --reload --port 8000
 ```
 
 ## Configuration
