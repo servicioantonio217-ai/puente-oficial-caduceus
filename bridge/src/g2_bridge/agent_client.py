@@ -35,20 +35,22 @@ class AgentClient:
     ) -> dict[str, Any]:
         """Send a message to the AI Agent and return the raw response.
 
-        Uses the OpenAI Responses API format:
-        POST /v1/responses with { input, conversation, stream: false }
+        Uses the OpenAI Chat Completions API format:
+        POST /chat/completions with { model, messages, stream: false }
         """
+        messages: list[dict[str, str]] = []
+        if self.settings.agent_instructions:
+            messages.append({"role": "system", "content": self.settings.agent_instructions})
+        messages.append({"role": "user", "content": content})
+
         payload: dict[str, Any] = {
-            "input": content,
+            "model": "default",
+            "messages": messages,
             "stream": False,
         }
-        if conversation_id:
-            payload["conversation"] = conversation_id
-        if self.settings.agent_instructions:
-            payload["instructions"] = self.settings.agent_instructions
 
         logger.debug("Sending to agent: %s", payload)
-        response = await self._client.post("/responses", json=payload)
+        response = await self._client.post("/chat/completions", json=payload)
 
         if response.status_code != 200:
             logger.error("Agent returned %d: %s", response.status_code, response.text)
@@ -57,27 +59,25 @@ class AgentClient:
         return dict(response.json())
 
     def parse_response(self, raw: dict[str, Any]) -> AgentResponse:
-        """Parse raw agent response into our AgentResponse model."""
-        conversation_id = raw.get("conversation", "")
-        output_items = raw.get("output", [])
-        usage = raw.get("usage", {})
+        """Parse raw agent Chat Completions response into our AgentResponse model."""
+        choices = raw.get("choices", [])
+        text = ""
+        if choices:
+            text = choices[0].get("message", {}).get("content", "")
 
         messages: list[OutputMessage] = []
-        for item in output_items:
-            if item.get("type") == "message":
-                content_items = []
-                for c in item.get("content", []):
-                    if c.get("type") == "output_text":
-                        content_items.append(OutputTextContent(text=c["text"]))
-                if content_items:
-                    messages.append(
-                        OutputMessage(role=item.get("role", "assistant"), content=content_items)
-                    )
+        if text:
+            messages.append(
+                OutputMessage(
+                    role="assistant",
+                    content=[OutputTextContent(text=text)],
+                )
+            )
 
         return AgentResponse(
             id=raw.get("id", ""),
-            status=raw.get("status", "completed"),
-            conversation=conversation_id,
+            status="completed",
+            conversation="",
             output=messages,
-            usage=usage,
+            usage=raw.get("usage", {}),
         )

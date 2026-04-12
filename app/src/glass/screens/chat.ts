@@ -33,6 +33,11 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   },
 
   action(action, nav, snapshot, ctx) {
+    // Back from chat to menu
+    if (action.type === 'NAV_BACK') {
+      ctx.goBack()
+      return nav
+    }
     // Tap to start/stop recording
     if (action.type === 'SELECT_HIGHLIGHTED') {
       ctx.toggleRecording()

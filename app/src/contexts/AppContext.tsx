@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, ChatMessage, BridgeConfig, AgentResponse } from '../types'
+import type { ScreenName } from '../glass/shared'
 import * as api from '../api'
 import { loadConfig, saveConfig } from '../storage'
 import { EvenAudioBridge } from '../audio'
@@ -22,6 +23,8 @@ interface AppContextValue {
   isLoading: boolean
   isRecording: boolean
   error: string | null
+  glassScreen: ScreenName
+  setGlassScreen: (screen: ScreenName) => void
   connect: () => Promise<void>
   disconnect: () => void
   refreshSessions: () => Promise<void>
@@ -44,6 +47,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [glassScreen, setGlassScreen] = useState<ScreenName>('menu')
 
   const configRef = useRef(config)
   configRef.current = config
@@ -96,6 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const detail = await api.getSession(configRef.current, session.id)
       setCurrentSession(detail)
       setMessages(detail.messages ?? [])
+      setGlassScreen('chat')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open session')
     } finally {
@@ -111,6 +116,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSessions((prev) => [session, ...prev])
       setCurrentSession(session)
       setMessages([])
+      setGlassScreen('chat')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create session')
     } finally {
@@ -125,6 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (currentSession?.id === id) {
         setCurrentSession(null)
         setMessages([])
+        setGlassScreen('menu')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete session')
@@ -264,6 +271,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         connected, sessions,
         currentSession, messages,
         isLoading, isRecording, error,
+        glassScreen, setGlassScreen,
         connect, disconnect,
         refreshSessions, openSession,
         newSession, removeSession,

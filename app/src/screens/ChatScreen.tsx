@@ -65,8 +65,7 @@ export function ChatScreen() {
                 value={inputValue}
                 onChange={setInputValue}
                 onSend={handleSend}
-                placeholder="Ask anything..."
-                disabled={isLoading}
+                placeholder={isLoading ? 'Waiting for response...' : 'Ask anything...'}
                 className="flex-1 !p-0 !bg-transparent"
               />
             </div>

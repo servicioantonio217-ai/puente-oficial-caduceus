@@ -1,11 +1,21 @@
+import { useNavigate } from 'react-router'
 import { useApp } from '../contexts/AppContext'
 import { Button } from 'even-toolkit/web'
 import { IcPlus } from 'even-toolkit/web/icons/svg-icons'
 
 export function SessionsScreen() {
   const { sessions, openSession, removeSession, newSession, isLoading } = useApp()
+  const navigate = useNavigate()
 
-  const handleNew = () => newSession()
+  const handleNew = () => {
+    newSession()
+    navigate('/')
+  }
+
+  const handleOpen = (session: { id: string; name?: string; message_count?: number }) => {
+    openSession(session)
+    navigate('/')
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -30,7 +40,7 @@ export function SessionsScreen() {
               <div
                 key={session.id}
                 className="flex items-center justify-between px-4 py-3 active:bg-surface-light cursor-pointer"
-                onClick={() => openSession(session)}
+                onClick={() => handleOpen(session)}
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">

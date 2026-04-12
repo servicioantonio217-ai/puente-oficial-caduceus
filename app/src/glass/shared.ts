@@ -17,6 +17,7 @@ export interface AppSnapshot {
 
 export interface AppActions {
   navigate: (screen: ScreenName) => void
+  goBack: () => void
   openSession: (session: Session) => void
   newSession: () => void
   sendMessage: (text: string) => void
