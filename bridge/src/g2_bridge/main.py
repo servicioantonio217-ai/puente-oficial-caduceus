@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from g2_bridge.agent_client import AgentClient
@@ -71,6 +72,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(AuthError)
     async def auth_exception_handler(request: Request, exc: AuthError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+    # Register CORS middleware (must be before routers)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # Register routers
     app.include_router(health.router)
