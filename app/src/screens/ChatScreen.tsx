@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChatContainer, ChatInput, ChatThinking } from 'even-toolkit/web'
+import { ChatContainer, ChatInput } from 'even-toolkit/web'
 import type { ChatMessage } from 'even-toolkit/web'
 import { useApp } from '../contexts/AppContext'
 

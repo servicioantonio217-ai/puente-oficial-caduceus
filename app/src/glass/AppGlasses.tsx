@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useGlasses } from 'even-toolkit/useGlasses'
 import { useFlashPhase } from 'even-toolkit/useFlashPhase'
-import { createScreenMapper, getHomeTiles } from 'even-toolkit/glass-router'
+import { getHomeTiles } from 'even-toolkit/glass-router'
 import { appSplash } from './splash'
 import { toDisplayData, onGlassAction, type AppSnapshot } from './selectors'
 import type { AppActions, ScreenName } from './shared'
@@ -24,7 +24,7 @@ export function AppGlasses() {
   const screen = deriveScreenName()
   const flashPhase = useFlashPhase(screen === 'menu')
 
-  const navigate = useCallback((_s: ScreenName) => {
+  const navigate = useCallback(() => {
     // Navigation is driven by app state, not explicit navigation
   }, [])
 
@@ -82,7 +82,7 @@ export function AppGlasses() {
 
   const getSnapshot = useCallback(() => snapshotRef.current, [snapshotRef])
 
-  const actions: AppActions = { navigate, openSession, newSession, sendMessage: sendText, toggleRecording: () => { isRecording ? stopRecording() : startRecording() } }
+  const actions: AppActions = { navigate, openSession, newSession, sendMessage: sendText, toggleRecording: () => { if (isRecording) stopRecording(); else startRecording() } }
   const ctxRef = useRef(actions)
   ctxRef.current = actions
 
@@ -92,7 +92,7 @@ export function AppGlasses() {
     [],
   )
 
-  const screenMapper = useCallback((_path: string) => {
+  const screenMapper = useCallback(() => {
     const name = deriveScreenName()
     if (name === 'chat') return 'chat'
     if (name === 'sessions') return 'sessions'

@@ -1,4 +1,4 @@
-import type { Session, ChatMessage } from '../types'
+import type { Session } from '../types'
 import type { ChatLine } from 'even-toolkit/glass-chat-display'
 
 export type ScreenName = 'splash' | 'menu' | 'sessions' | 'chat' | 'settings'

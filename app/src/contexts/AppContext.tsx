@@ -188,6 +188,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const startRecording = useCallback(() => {
     if (!currentSession || isRecording) return
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { AudioRecorder } = require('../audio/recorder')
     const recorder = new AudioRecorder()
 
@@ -274,6 +275,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp(): AppContextValue {
   const ctx = useContext(AppContext)
   if (!ctx) throw new Error('useApp must be used within AppProvider')
