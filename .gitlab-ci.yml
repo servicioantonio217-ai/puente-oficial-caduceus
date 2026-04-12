@@ -1,0 +1,59 @@
+stages:
+  - lint
+  - typecheck
+  - test
+  - build
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+
+# --- Bridge (Python) ---
+
+bridge:lint:
+  stage: lint
+  image: python:3.11-slim
+  before_script:
+    - pip install ruff
+  script:
+    - cd bridge
+    - ruff check src/ tests/
+    - ruff format --check src/ tests/
+
+bridge:typecheck:
+  stage: typecheck
+  image: python:3.11-slim
+  before_script:
+    - pip install -e ".[dev]" > /dev/null
+  script:
+    - cd bridge
+    - mypy src/
+  allow_failure: true  # Strict mode — fix incrementally
+
+bridge:test:
+  stage: test
+  image: python:3.11-slim
+  before_script:
+    - pip install -e ".[dev]" > /dev/null
+  script:
+    - cd bridge
+    - pytest tests/ -v
+
+bridge:docker:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE/bridge:$CI_COMMIT_SHA ./bridge
+    - docker push $CI_REGISTRY_IMAGE/bridge:$CI_COMMIT_SHA
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
