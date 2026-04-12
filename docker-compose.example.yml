@@ -1,0 +1,31 @@
+# Podman Compose example for G2 Caduceus
+#
+# Usage:
+#   podman compose -f docker-compose.example.yml up -d
+#
+# Requires a .env file or exported environment variables:
+#   G2_BRIDGE_TOKEN=mytoken
+#   G2_AGENT_API_KEY=mykey
+#   G2_AGENT_API_URL=http://host.containers.internal:8642/v1
+#   G2_STT_API_URL=http://host.containers.internal:4000/v1/audio/transcriptions
+
+services:
+  bridge:
+    build: ./bridge
+    ports:
+      - "8643:8000"
+    environment:
+      - G2_BRIDGE_TOKEN=${G2_BRIDGE_TOKEN}
+      - G2_AGENT_API_KEY=${G2_AGENT_API_KEY}
+      - G2_AGENT_API_URL=${G2_AGENT_API_URL:-http://host.containers.internal:8642/v1}
+      - G2_STT_API_URL=${G2_STT_API_URL:-}
+      - G2_STT_API_KEY=${G2_STT_API_KEY:-}
+      - G2_STT_MODEL=${G2_STT_MODEL:-whisper-1}
+      - G2_DATABASE_PATH=/data/g2_bridge.db
+      - G2_MAX_RESPONSE_CHARS=${G2_MAX_RESPONSE_CHARS:-500}
+    volumes:
+      - g2-data:/data
+    restart: unless-stopped
+
+volumes:
+  g2-data:
