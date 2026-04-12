@@ -8,24 +8,25 @@ import type { AppSnapshot, AppActions } from '../shared'
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Layout (10 lines total):
- *   ┌─────────────────────┐
- *   │ Session · REC       │  ← inverted header with recording status
- *   │─────────────────────│
- *   │ > user message      │  ← chat lines (scrollable, 7 slots)
- *   │                     │
- *   │   assistant reply   │
- *   │                     │
- *   │─────────────────────│
- *   │ [● Record]          │  ← action bar
- *   └─────────────────────┘
+ * Visual language ("Signal" design):
+ *   ● filled  = live, active, now
+ *   ○ hollow  = waiting, processing
+ *   > arrow   = outgoing (user)
+ *     indent  = incoming (assistant)
+ *   ! alert   = error
+ *   · dot     = meta / separator
+ *   — dash    = inactive / blocked
  *
- * Features:
- * - Header shows session name + recording status + message count
- * - Compact sender markers: ">" for user, indented for AI (via even-toolkit)
- * - Auto-scrolls to bottom on new messages
- * - Empty state shows connection context
- * - buildChatDisplay handles separator between header and content
+ * Header states:
+ *   Idle:            Caduceus · 5               ● Record
+ *   Recording:       Caduceus ● REC · 5         ■ Stop
+ *   AI processing:   Caduceus · 5               ○ thinking
+ *   Disconnected:    Caduceus · 5               — offline
+ *
+ * Layout (10 lines):
+ *   Header + separator (3 lines, always visible)
+ *   Content area (7 lines, scrollable)
+ *   Action bar (inline in header line)
  */
 
 /** Visible content lines (10 total - 3 header lines) */
@@ -36,29 +37,36 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     const name = snapshot.currentSession?.name ?? 'Caduceus'
     const msgCount = snapshot.chatLines.length
 
-    // Recording indicator in header
-    const recIndicator = snapshot.isRecording ? 'REC' : 'idle'
+    // Header: status indicator only when active, never "idle"
+    // ● REC = recording live, nothing = idle (absence is the signal)
+    const statusPart = snapshot.isRecording
+      ? `● REC · ${msgCount}`
+      : `${msgCount}`
 
-    // Compact header: name + status + count
-    const title = fieldJoin(
-      name,
-      `${recIndicator} · ${msgCount}`,
-    )
+    const title = fieldJoin(name, statusPart)
 
-    // Action bar — single button with status icon
-    const actionBar = buildStaticActionBar(
-      [snapshot.isRecording ? '■ Stop' : '● Record'],
-      0,
-    )
+    // Action bar: one of four states, consistent symbol family
+    let actionLabel: string
+    if (!snapshot.connected) {
+      actionLabel = '— offline'
+    } else if (snapshot.isRecording) {
+      actionLabel = '■ Stop'
+    } else if (snapshot.isProcessing) {
+      actionLabel = '○ thinking'
+    } else {
+      actionLabel = '● Record'
+    }
 
-    // Empty state with connection context
+    const actionBar = buildStaticActionBar([actionLabel], 0)
+
+    // Empty state — short, actionable
     const lines = snapshot.chatLines.length > 0
       ? snapshot.chatLines
       : [{
           type: 'system' as const,
           text: snapshot.connected
-            ? 'Connected — tap ● Record'
-            : 'Disconnected',
+            ? 'Ready — tap ● Record'
+            : 'No connection',
         }]
 
     return buildChatDisplay({
@@ -77,7 +85,10 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     }
 
     if (action.type === 'SELECT_HIGHLIGHTED') {
-      ctx.toggleRecording()
+      // Only allow recording toggle when connected and not processing
+      if (snapshot.connected && !snapshot.isProcessing) {
+        ctx.toggleRecording()
+      }
       return nav
     }
 

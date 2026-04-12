@@ -19,6 +19,7 @@ export interface AppSnapshot {
   currentSession: Session | null
   chatLines: ChatLine[]
   isRecording: boolean
+  isProcessing: boolean
 }
 
 export interface AppActions {

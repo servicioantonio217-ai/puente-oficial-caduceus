@@ -36,23 +36,17 @@ export function AppGlasses() {
     [sessions],
   )
 
-  // Build chat lines for the chat screen
+  // Build chat lines — pure content only, no status indicators.
+  // Status (recording/processing) lives in the header & action bar, not in chat content.
+  // Assistant messages get 2-space indent for visual grouping; user messages keep > prefix.
   const chatLines = useMemo(() => {
-    const lines = messages.map((msg) => {
+    return messages.map((msg) => {
       if (msg.role === 'user') return { type: 'prompt' as const, text: msg.content }
-      if (msg.role === 'assistant') return { type: 'text' as const, text: msg.content }
+      // 2-space prefix creates visual indent for assistant messages
+      if (msg.role === 'assistant') return { type: 'text' as const, text: `  ${msg.content}` }
       return { type: 'system' as const, text: msg.content }
     })
-
-    // Add recording/thinking indicator
-    if (isRecording) {
-      return [...lines, { type: 'thinking-collapsed' as const, text: 'Listening...' }]
-    }
-    if (isLoading) {
-      return [...lines, { type: 'thinking-collapsed' as const, text: 'Thinking...' }]
-    }
-    return lines
-  }, [messages, isLoading, isRecording])
+  }, [messages])
 
   const snapshot: AppSnapshot = {
     screen: deriveScreenName(),
@@ -61,6 +55,7 @@ export function AppGlasses() {
     currentSession,
     chatLines,
     isRecording,
+    isProcessing: isLoading,
   }
 
   const snapshotRef = useMemo(() => ({ current: snapshot }), []) // eslint-disable-line react-hooks/exhaustive-deps
