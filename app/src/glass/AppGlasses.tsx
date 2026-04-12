@@ -94,10 +94,25 @@ export function AppGlasses() {
   const ctxRef = useRef(actions)
   ctxRef.current = actions
 
+  // Auto-scroll: wrap onGlassAction to reset scroll on new messages
+  const lastMsgCountRef = useRef(0)
+
   const handleGlassAction = useCallback(
-    (action: Parameters<typeof onGlassAction>[0], nav: Parameters<typeof onGlassAction>[1], snap: AppSnapshot) =>
-      onGlassAction(action, nav, snap, ctxRef.current),
-    [],
+    (action: Parameters<typeof onGlassAction>[0], nav: Parameters<typeof onGlassAction>[1], snap: AppSnapshot) => {
+      const result = onGlassAction(action, nav, snap, ctxRef.current)
+
+      // Auto-scroll to bottom when new messages arrived since last action
+      const msgCount = snap.chatLines.length
+      if (msgCount !== lastMsgCountRef.current) {
+        lastMsgCountRef.current = msgCount
+        if (result.screen === 'chat') {
+          return { ...result, highlightedIndex: 0 }
+        }
+      }
+
+      return result
+    },
+    [], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   const screenMapper = useCallback(() => {
@@ -109,7 +124,7 @@ export function AppGlasses() {
     toDisplayData,
     onGlassAction: handleGlassAction,
     deriveScreen: screenMapper,
-    appName: 'G2 CADUCEUS',
+    appName: 'Caduceus',
     splash: appSplash,
     getPageMode: () => 'text' as const,
   })

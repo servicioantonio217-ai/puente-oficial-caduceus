@@ -2,46 +2,71 @@ import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { calcMaxScroll } from 'even-toolkit/glass-nav'
 import { buildChatDisplay } from 'even-toolkit/glass-chat-display'
 import { buildStaticActionBar } from 'even-toolkit/action-bar'
+import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
 
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Layout:
+ * Layout (10 lines total):
  *   ┌─────────────────────┐
- *   │ Session Name        │  ← title line (inverted header)
+ *   │ Session · REC       │  ← inverted header with recording status
  *   │─────────────────────│
- *   │ You: ...            │  ← chat lines (scrollable)
- *   │ AI: ...             │
+ *   │ > user message      │  ← chat lines (scrollable, 7 slots)
+ *   │                     │
+ *   │   assistant reply   │
  *   │                     │
  *   │─────────────────────│
  *   │ [● Record]          │  ← action bar
  *   └─────────────────────┘
  *
- * Empty state shows a centered hint.
- * System messages use 'meta' style for visual separation.
- * Auto-scrolls to bottom on new messages (highlightedIndex = max).
+ * Features:
+ * - Header shows session name + recording status + message count
+ * - Compact sender markers: ">" for user, indented for AI (via even-toolkit)
+ * - Auto-scrolls to bottom on new messages
+ * - Empty state shows connection context
+ * - buildChatDisplay handles separator between header and content
  */
+
+/** Visible content lines (10 total - 3 header lines) */
+const CONTENT_SLOTS = 7
+
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    const title = snapshot.currentSession?.name ?? 'Caduceus'
+    const name = snapshot.currentSession?.name ?? 'Caduceus'
+    const msgCount = snapshot.chatLines.length
 
-    // Action bar — single button, always at index 0
+    // Recording indicator in header
+    const recIndicator = snapshot.isRecording ? 'REC' : 'idle'
+
+    // Compact header: name + status + count
+    const title = fieldJoin(
+      name,
+      `${recIndicator} · ${msgCount}`,
+    )
+
+    // Action bar — single button with status icon
     const actionBar = buildStaticActionBar(
       [snapshot.isRecording ? '■ Stop' : '● Record'],
       0,
     )
 
-    // Build chat lines with empty state
+    // Empty state with connection context
     const lines = snapshot.chatLines.length > 0
       ? snapshot.chatLines
-      : [{ type: 'system' as const, text: 'Tap ● Record to start' }]
+      : [{
+          type: 'system' as const,
+          text: snapshot.connected
+            ? 'Connected — tap ● Record'
+            : 'Disconnected',
+        }]
 
     return buildChatDisplay({
       title,
       actionBar,
       chatLines: lines,
       scrollOffset: nav.highlightedIndex,
+      contentSlots: CONTENT_SLOTS,
     })
   },
 
@@ -57,8 +82,7 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     }
 
     if (action.type === 'HIGHLIGHT_MOVE') {
-      const visibleLines = 7
-      const maxScroll = calcMaxScroll(snapshot.chatLines.length, visibleLines)
+      const maxScroll = calcMaxScroll(snapshot.chatLines.length, CONTENT_SLOTS)
       const delta = action.direction === 'up' ? 1 : -1
       const next = nav.highlightedIndex + delta
       return { ...nav, highlightedIndex: Math.max(0, Math.min(maxScroll, next)) }
