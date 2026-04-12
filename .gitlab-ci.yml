@@ -6,10 +6,13 @@ stages:
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
 
 cache:
   paths:
     - .cache/pip
+    - app/node_modules/
+    - .cache/npm/
 
 # --- Bridge (Python) ---
 
@@ -54,6 +57,47 @@ bridge:container:
     - podman $PODMAN_OPTS build -t $CONTAINER_IMAGE -t $CI_REGISTRY_IMAGE/bridge:latest ./bridge
     - podman $PODMAN_OPTS push $CONTAINER_IMAGE
     - podman $PODMAN_OPTS push $CI_REGISTRY_IMAGE/bridge:latest
+    rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# --- App (TypeScript) ---
+
+app:lint:
+  stage: lint
+  image: node:20-alpine
+  before_script:
+    - cd app && npm ci
+  script:
+    - npx eslint src/ --max-warnings 0
+
+app:typecheck:
+  stage: typecheck
+  image: node:20-alpine
+  before_script:
+    - cd app && npm ci
+  script:
+    - npx tsc --noEmit
+
+app:test:
+  stage: test
+  image: node:20-alpine
+  before_script:
+    - cd app && npm ci
+  script:
+    - npx vitest run --reporter=verbose
+
+app:build:
+  stage: build
+  image: node:20-alpine
+  before_script:
+    - cd app && npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - app/dist/
+    expire_in: 1 week
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
