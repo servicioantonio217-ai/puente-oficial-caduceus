@@ -29,8 +29,8 @@ const DEFAULT_OPTIONS: Required<AudioRecorderOptions> = {
   minDurationMs: 500,
 }
 
-/** Convert Float32 PCM samples to WAV blob (16-bit LE, mono). */
-export function pcmToWav(samples: Float32Array, sampleRate: number): Blob {
+/** Convert Float32 PCM samples to WAV ArrayBuffer (16-bit LE, mono). */
+export function pcmToWavBuffer(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const numChannels = 1
   const bitsPerSample = 16
   const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
@@ -62,7 +62,12 @@ export function pcmToWav(samples: Float32Array, sampleRate: number): Blob {
     offset += 2
   }
 
-  return new Blob([buffer], { type: 'audio/wav' })
+  return buffer
+}
+
+/** Convert Float32 PCM samples to WAV blob (16-bit LE, mono). */
+export function pcmToWav(samples: Float32Array, sampleRate: number): Blob {
+  return new Blob([pcmToWavBuffer(samples, sampleRate)], { type: 'audio/wav' })
 }
 
 function writeString(view: DataView, offset: number, str: string): void {
