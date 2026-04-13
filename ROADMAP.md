@@ -96,7 +96,7 @@ Each phase is self-contained and testable independently.
 - [x] Splash screen: disabled (undefined, no pixel spinner)
 - [x] Plain text status labels (Idle, Listening, Thinking, Offline)
 - [x] Follow even-toolkit patterns: `display()` + `action()` per screen, `nav.screen` for transitions
-- [ ] Error handling & reconnection (bridge offline, agent timeout, STT failure)
+- [x] Error handling & reconnection (bridge offline, agent timeout, STT failure)
 - [ ] Idle resilience (no freeze after 2 min, foreground/background lifecycle)
 
 ### Repo Hygiene
@@ -107,8 +107,8 @@ Each phase is self-contained and testable independently.
 
 ### Testing
 
-- [ ] Bridge: increase coverage (edge cases, error paths, auth failures)
-- [ ] App: audio module edge-case tests
+- [x] Bridge: increase coverage (edge cases, error paths, auth failures — 108 tests)
+- [x] App: audio module edge-case tests (350 LOC audio.test.ts)
 - [x] Integration smoke test (15 tests — full API flow, auth, error paths, CORS, audio, truncation)
 
 ### Features
@@ -144,4 +144,4 @@ Each phase is self-contained and testable independently.
 - [x] Phase 1 — Bridge MVP
 - [x] Phase 2 — App Scaffold
 - [x] Phase 3 — Voice Pipeline (bridge + app wiring done, E2E hardware test pending)
-- [ ] Phase 4 — Quality & OSS Readiness (docs, license, compose done; testing + infra pending)
+- [ ] Phase 4 — Quality & OSS Readiness (error handling, testing, session rename, docs done; idle resilience, .ehpk build, QR sideload docs pending)
