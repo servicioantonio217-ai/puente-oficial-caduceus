@@ -3,6 +3,9 @@ import type { Session, ChatMessage, AgentResponse, BridgeConfig } from './types'
 /** Default request timeout in milliseconds. */
 const REQUEST_TIMEOUT_MS = 30_000
 
+/** Agent responses can take much longer than regular API calls. */
+const AGENT_TIMEOUT_MS = 180_000
+
 /** Create a fetch with automatic timeout. */
 async function fetchWithTimeout(
   url: string,
@@ -123,7 +126,7 @@ export async function sendMessage(
     method: 'POST',
     headers: headers(config),
     body: JSON.stringify({ content }),
-  })
+  }, AGENT_TIMEOUT_MS)
   if (!res.ok) {
     const detail = await extractErrorMessage(res, `Failed to send message: ${res.status}`)
     throw new Error(detail)
@@ -146,7 +149,7 @@ export async function sendAudio(
       Authorization: `Bearer ${config.token}`,
     },
     body: formData,
-  })
+  }, AGENT_TIMEOUT_MS)
   if (!res.ok) {
     const detail = await extractErrorMessage(res, `Failed to send audio: ${res.status}`)
     throw new Error(detail)

@@ -7,7 +7,20 @@ import {
   useEffect,
   type ReactNode,
 } from 'react'
-import type { Session, ChatMessage, BridgeConfig, AgentResponse } from '../types'
+import type { Session, ChatMessage, AgentResponse, BridgeConfig } from '../types'
+
+/** Generate a UUID v4, with fallback for WebViews without crypto.randomUUID(). */
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // RFC 4122 v4 fallback via Math.random
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
 
 import * as api from '../api'
 import { loadConfig, saveConfig } from '../storage'
@@ -201,7 +214,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Optimistically add user message
     const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       role: 'user',
       content,
       created_at: new Date().toISOString(),
@@ -226,7 +239,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       const assistantMsg: ChatMessage = {
-        id: response.id ?? crypto.randomUUID(),
+        id: response.id ?? uuid(),
         role: 'assistant',
         content: assistantText,
         created_at: new Date().toISOString(),
@@ -263,7 +276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           // Add transcript as user message
           const userMsg: ChatMessage = {
-            id: crypto.randomUUID(),
+            id: uuid(),
             role: 'user',
             content: result.transcript,
             created_at: new Date().toISOString(),
@@ -279,7 +292,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
 
           const assistantMsg: ChatMessage = {
-            id: result.response.id ?? crypto.randomUUID(),
+            id: result.response.id ?? uuid(),
             role: 'assistant',
             content: assistantText,
             created_at: new Date().toISOString(),
