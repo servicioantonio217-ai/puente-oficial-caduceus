@@ -123,7 +123,7 @@ Each phase is self-contained and testable independently.
 - [x] Bridge README (setup, configuration reference, env vars)
 - [x] App README (sideload, Even Hub submission, troubleshooting)
 - [x] CONTRIBUTING.md (dev setup, code style, PR process)
-- [ ] Update ARCHITECTURE.md (remove stale references)
+- [x] Update ARCHITECTURE.md (fix stale project structure — `stt_client.py` not `stt.py`, remove `webui.ts`, update file tree)
 
 ### Infrastructure
 
