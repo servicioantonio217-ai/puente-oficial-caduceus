@@ -1,6 +1,7 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { calcMaxScroll } from 'even-toolkit/glass-nav'
 import { buildChatDisplay } from 'even-toolkit/glass-chat-display'
+import { buildStaticActionBar } from 'even-toolkit/action-bar'
 import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
 
@@ -38,6 +39,7 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
 
     return buildChatDisplay({
       title,
+      actionBar: buildStaticActionBar(['Record'], 0),
       chatLines: lines,
       scrollOffset: nav.highlightedIndex,
       contentSlots: CONTENT_SLOTS,

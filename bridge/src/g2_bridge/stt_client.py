@@ -58,7 +58,7 @@ class STTClient:
         if raw.startswith("{"):
             try:
                 parsed = json.loads(raw)
-                transcript = parsed.get("text", "")
+                transcript = str(parsed.get("text", ""))
             except json.JSONDecodeError:
                 transcript = raw
         else:
