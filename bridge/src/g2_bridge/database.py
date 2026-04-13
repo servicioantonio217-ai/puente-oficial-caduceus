@@ -104,6 +104,14 @@ class Database:
         )
         await self.connection.commit()
 
+    async def rename_session(self, session_id: str, name: str, now: str) -> bool:
+        cursor = await self.connection.execute(
+            "UPDATE sessions SET name = ?, updated_at = ? WHERE id = ?",
+            (name, now, session_id),
+        )
+        await self.connection.commit()
+        return cursor.rowcount > 0
+
     async def delete_session(self, session_id: str) -> bool:
         cursor = await self.connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         await self.connection.commit()

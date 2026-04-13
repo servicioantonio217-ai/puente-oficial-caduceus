@@ -65,6 +65,10 @@ class CreateSessionRequest(BaseModel):
     name: str | None = None
 
 
+class RenameSessionRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+
 class SessionResponse(BaseModel):
     id: str
     name: str
