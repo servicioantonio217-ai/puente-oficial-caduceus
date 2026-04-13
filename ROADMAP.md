@@ -128,7 +128,7 @@ Each phase is self-contained and testable independently.
 ### Infrastructure
 
 - [x] Podman Compose example (bridge + STT proxy)
-- [ ] App `.ehpk` build workflow (CI)
+- [x] App `.ehpk` build workflow (CI)
 - [ ] QR sideload dev workflow documentation
 
 ### Legal
@@ -144,4 +144,4 @@ Each phase is self-contained and testable independently.
 - [x] Phase 1 — Bridge MVP
 - [x] Phase 2 — App Scaffold
 - [x] Phase 3 — Voice Pipeline (bridge + app wiring done, E2E hardware test pending)
-- [x] Phase 4 — Quality & OSS Readiness (error handling, testing, session rename, idle resilience, docs done; .ehpk build, QR sideload docs, TTS pending)
+- [x] Phase 4 — Quality & OSS Readiness (error handling, testing, session rename, idle resilience, docs, .ehpk build done; QR sideload docs, TTS pending)
