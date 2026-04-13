@@ -97,7 +97,7 @@ Each phase is self-contained and testable independently.
 - [x] Plain text status labels (Idle, Listening, Thinking, Offline)
 - [x] Follow even-toolkit patterns: `display()` + `action()` per screen, `nav.screen` for transitions
 - [x] Error handling & reconnection (bridge offline, agent timeout, STT failure)
-- [ ] Idle resilience (no freeze after 2 min, foreground/background lifecycle)
+- [x] Idle resilience (no freeze after 2 min, foreground/background lifecycle)
 
 ### Repo Hygiene
 
@@ -144,4 +144,4 @@ Each phase is self-contained and testable independently.
 - [x] Phase 1 — Bridge MVP
 - [x] Phase 2 — App Scaffold
 - [x] Phase 3 — Voice Pipeline (bridge + app wiring done, E2E hardware test pending)
-- [ ] Phase 4 — Quality & OSS Readiness (error handling, testing, session rename, docs done; idle resilience, .ehpk build, QR sideload docs pending)
+- [x] Phase 4 — Quality & OSS Readiness (error handling, testing, session rename, idle resilience, docs done; .ehpk build, QR sideload docs, TTS pending)
