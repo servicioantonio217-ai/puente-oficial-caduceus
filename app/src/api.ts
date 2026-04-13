@@ -58,6 +58,17 @@ export async function deleteSession(config: BridgeConfig, id: string): Promise<v
   if (!res.ok) throw new Error(`Failed to delete session: ${res.status}`)
 }
 
+/** Rename a session. */
+export async function renameSession(config: BridgeConfig, id: string, name: string): Promise<Session> {
+  const res = await fetch(`${config.url}/v1/sessions/${id}`, {
+    method: 'PATCH',
+    headers: headers(config),
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error(`Failed to rename session: ${res.status}`)
+  return res.json()
+}
+
 /** Send a text message and get AI response. */
 export async function sendMessage(
   config: BridgeConfig,

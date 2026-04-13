@@ -113,7 +113,7 @@ Each phase is self-contained and testable independently.
 
 ### Features
 
-- [ ] Session rename from WebUI
+- [x] Session rename from WebUI
 - [x] Session delete from WebUI (works, needs glasses confirmation UX)
 - [ ] TTS for AI responses (phone/Bluetooth headset — G2 has no speaker)
 

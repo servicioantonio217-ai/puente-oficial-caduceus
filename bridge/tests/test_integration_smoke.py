@@ -525,3 +525,82 @@ async def test_multiple_messages_in_session(client: AsyncClient) -> None:
     for i, msg in enumerate(detail["messages"]):
         expected_role = "user" if i % 2 == 0 else "assistant"
         assert msg["role"] == expected_role
+
+
+# ============================================================
+# Session rename
+# ============================================================
+
+
+@pytest.mark.asyncio
+async def test_rename_session_success(client):
+    """PATCH /v1/sessions/{id} with valid name returns 200."""
+    # Create a session first
+    resp = await client.post("/v1/sessions", json={"name": "Old Name"}, headers=HEADERS)
+    assert resp.status_code == 201
+    session_id = resp.json()["id"]
+
+    # Rename it
+    resp = await client.patch(
+        f"/v1/sessions/{session_id}",
+        json={"name": "New Name"},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["name"] == "New Name"
+    assert data["id"] == session_id
+    assert "updated_at" in data
+
+
+@pytest.mark.asyncio
+async def test_rename_session_empty_name_returns_422(client):
+    """PATCH with empty name returns 422 validation error."""
+    resp = await client.post("/v1/sessions", headers=HEADERS)
+    session_id = resp.json()["id"]
+
+    resp = await client.patch(
+        f"/v1/sessions/{session_id}",
+        json={"name": ""},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rename_session_not_found(client):
+    """PATCH on nonexistent session returns 404."""
+    resp = await client.patch(
+        "/v1/sessions/nonexistent-id",
+        json={"name": "New Name"},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_rename_session_no_auth(client):
+    """PATCH without auth returns 401."""
+    resp = await client.post("/v1/sessions", headers=HEADERS)
+    session_id = resp.json()["id"]
+
+    resp = await client.patch(
+        f"/v1/sessions/{session_id}",
+        json={"name": "New Name"},
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_rename_session_name_too_long(client):
+    """PATCH with name >100 chars returns 422."""
+    resp = await client.post("/v1/sessions", headers=HEADERS)
+    session_id = resp.json()["id"]
+
+    long_name = "A" * 101
+    resp = await client.patch(
+        f"/v1/sessions/{session_id}",
+        json={"name": long_name},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 422

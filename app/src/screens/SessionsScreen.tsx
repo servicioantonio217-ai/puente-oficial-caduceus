@@ -5,7 +5,7 @@ import { Button } from 'even-toolkit/web'
 import { IcPlus } from 'even-toolkit/web/icons/svg-icons'
 
 export function SessionsScreen() {
-  const { sessions, openSession, removeSession, newSession, isLoading } = useApp()
+  const { sessions, openSession, removeSession, renameSession, newSession, isLoading } = useApp()
   const navigate = useNavigate()
 
   const handleNew = () => {
@@ -51,15 +51,27 @@ export function SessionsScreen() {
                     {session.message_count ?? 0} messages
                   </p>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (confirm('Delete this session?')) removeSession(session.id)
-                  }}
-                  className="ml-2 text-negative text-xs opacity-60 hover:opacity-100"
-                >
-                  Delete
-                </button>
+                <div className="flex items-center gap-2 ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const newName = prompt('Rename session:', session.name || '')
+                      if (newName && newName.trim()) renameSession(session.id, newName.trim())
+                    }}
+                    className="text-text-dim text-xs opacity-60 hover:opacity-100"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (confirm('Delete this session?')) removeSession(session.id)
+                    }}
+                    className="text-negative text-xs opacity-60 hover:opacity-100"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>

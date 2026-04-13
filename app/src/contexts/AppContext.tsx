@@ -30,6 +30,7 @@ interface AppContextValue {
   closeSession: () => void
   newSession: (name?: string) => Promise<void>
   removeSession: (id: string) => Promise<void>
+  renameSession: (id: string, name: string) => Promise<void>
   sendText: (content: string) => Promise<void>
   startRecording: () => void
   stopRecording: () => void
@@ -141,6 +142,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete session')
+    }
+  }, [currentSession])
+
+  const renameSession = useCallback(async (id: string, name: string) => {
+    try {
+      const updated = await api.renameSession(configRef.current, id, name)
+      setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)))
+      if (currentSession?.id === id) {
+        setCurrentSession(updated)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to rename session')
     }
   }, [currentSession])
 
@@ -279,7 +292,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLoading, isRecording, error,
         connect, disconnect,
         refreshSessions, openSession, closeSession,
-        newSession, removeSession,
+        newSession, removeSession, renameSession,
         sendText, startRecording, stopRecording,
       }}
     >

@@ -12,6 +12,7 @@ from g2_bridge.database import Database
 from g2_bridge.models import (
     CreateSessionRequest,
     MessageResponse,
+    RenameSessionRequest,
     SessionDetailResponse,
     SessionResponse,
 )
@@ -112,6 +113,35 @@ async def get_session(request: Request, session_id: str) -> SessionDetailRespons
             )
             for m in messages
         ],
+    )
+
+
+@router.patch("/{session_id}", response_model=SessionResponse)
+async def rename_session(
+    request: Request, session_id: str, body: RenameSessionRequest
+) -> SessionResponse:
+    """Rename a session."""
+    from fastapi.security import HTTPBearer
+
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
+    settings = request.app.state.settings
+    verify_client_token(credentials, settings)
+
+    db: Database = request.app.state.db
+    now = _now_iso()
+    renamed = await db.rename_session(session_id, body.name, now)
+    if not renamed:
+        raise AuthError(status_code=404, detail="Session not found")
+
+    session = await db.get_session(session_id)
+    return SessionResponse(
+        id=session["id"],
+        name=session["name"],
+        created_at=session["created_at"],
+        updated_at=session["updated_at"],
+        message_count=session["message_count"],
     )
 
 
