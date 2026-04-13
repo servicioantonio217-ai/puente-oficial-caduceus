@@ -109,7 +109,7 @@ Each phase is self-contained and testable independently.
 
 - [ ] Bridge: increase coverage (edge cases, error paths, auth failures)
 - [ ] App: audio module edge-case tests
-- [ ] Integration smoke test (bridge + app against each other, CI-level)
+- [x] Integration smoke test (15 tests — full API flow, auth, error paths, CORS, audio, truncation)
 
 ### Features
 
