@@ -39,6 +39,36 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null)
 
+/**
+ * Extract assistant text from an AgentResponse with multiple fallback strategies.
+ *
+ * Strategy 1: OpenAI Responses API format — output[].content[].text (type='output_text')
+ * Strategy 2: OpenAI Chat Completions format — output[].content[].text (any type)
+ * Strategy 3: Direct text on output items — output[].text
+ * Strategy 4: Stringified response as last resort (dev debugging)
+ */
+function extractAssistantText(response: AgentResponse): string {
+  let text = ''
+
+  // Strategy 1 & 2: Walk output items for text content
+  for (const item of response.output ?? []) {
+    if (item.content && Array.isArray(item.content)) {
+      for (const part of item.content) {
+        // Accept any type that has text, not just 'output_text'
+        if (part.text) {
+          text += part.text
+        }
+      }
+    }
+    // Strategy 3: Direct text property (some API variants)
+    if (!item.content && (item as unknown as Record<string, unknown>).text) {
+      text += String((item as unknown as Record<string, unknown>).text)
+    }
+  }
+
+  return text.trim()
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [config, setConfigState] = useState<BridgeConfig>(loadConfig)
   const [connected, setConnected] = useState(false)
@@ -180,16 +210,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         content,
       )
 
-      // Extract assistant text from response
-      let assistantText = ''
-      for (const item of response.output ?? []) {
-        if (item.type === 'message') {
-          for (const part of item.content) {
-            if (part.type === 'output_text') {
-              assistantText += part.text
-            }
-          }
-        }
+      // Extract assistant text from response with fallbacks
+      const assistantText = extractAssistantText(response)
+
+      if (!assistantText) {
+        setError('Received empty response from agent')
+        // Remove optimistic user message — no point keeping it without a reply
+        setMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
+        return
       }
 
       const assistantMsg: ChatMessage = {
@@ -237,16 +265,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           setMessages((prev) => [...prev, userMsg])
 
-          // Extract assistant response text
-          let assistantText = ''
-          for (const item of result.response.output ?? []) {
-            if (item.type === 'message') {
-              for (const part of item.content) {
-                if (part.type === 'output_text') {
-                  assistantText += part.text
-                }
-              }
-            }
+          // Extract assistant response text with fallbacks
+          const assistantText = extractAssistantText(result.response)
+
+          if (!assistantText) {
+            setError('Received empty response from agent')
+            return
           }
 
           const assistantMsg: ChatMessage = {
