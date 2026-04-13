@@ -20,6 +20,7 @@ export interface AppSnapshot {
   chatLines: ChatLine[]
   isRecording: boolean
   isProcessing: boolean
+  error: string | null
 }
 
 export interface AppActions {

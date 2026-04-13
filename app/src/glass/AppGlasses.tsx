@@ -18,7 +18,7 @@ import { MAX_GLASS_SESSIONS } from './ui-helpers'
 export function AppGlasses() {
   const {
     connected, sessions, currentSession, messages,
-    isLoading, isRecording, error: _error,
+    isLoading, isRecording, error,
     newSession, openSession, closeSession, sendText, startRecording, stopRecording,
   } = useApp()
 
@@ -40,13 +40,20 @@ export function AppGlasses() {
   // Status (recording/processing) lives in the header & action bar, not in chat content.
   // Assistant messages get 2-space indent for visual grouping; user messages keep > prefix.
   const chatLines = useMemo(() => {
-    return messages.map((msg) => {
+    const lines: Array<{ type: 'prompt' | 'text' | 'system' | 'error'; text: string }> = messages.map((msg) => {
       if (msg.role === 'user') return { type: 'prompt' as const, text: msg.content }
       // 2-space prefix creates visual indent for assistant messages
       if (msg.role === 'assistant') return { type: 'text' as const, text: `  ${msg.content}` }
       return { type: 'system' as const, text: msg.content }
     })
-  }, [messages])
+    // Show error as error line when idle (not recording, not processing)
+    if (error && !isLoading && !isRecording) {
+      // Truncate long errors to fit G2 display (~44 chars/line)
+      const truncated = error.length > 40 ? error.slice(0, 37) + '...' : error
+      lines.push({ type: 'error' as const, text: truncated })
+    }
+    return lines
+  }, [messages, error, isLoading, isRecording])
 
   const snapshot: AppSnapshot = {
     screen: deriveScreenName(),
@@ -56,6 +63,7 @@ export function AppGlasses() {
     chatLines,
     isRecording,
     isProcessing: isLoading,
+    error,
   }
 
   const snapshotRef = useMemo(() => ({ current: snapshot }), []) // eslint-disable-line react-hooks/exhaustive-deps
