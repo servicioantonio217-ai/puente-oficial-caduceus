@@ -121,7 +121,7 @@ app:package:
   variables:
     GIT_CLEAN_FLAGS: -ffdx
   before_script:
-    - cd app && npm ci --legacy-peer-deps
+    - cd app && npm ci
   script:
     - npx evenhub pack app.json dist -o caduceus.ehpk
   artifacts:
