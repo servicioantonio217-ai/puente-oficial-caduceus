@@ -244,43 +244,92 @@ The bridge MUST truncate/summarize responses before sending to the app. The app 
 
 ```
 g2-caduceus/
-├── bridge/                      # G2 Bridge Server (Python)
-│   ├── pyproject.toml           # Dependencies (FastAPI, httpx, aiosqlite, etc.)
-│   ├── src/
-│   │   ├── main.py              # FastAPI app entry point
-│   │   ├── config.py            # Configuration (env vars)
-│   │   ├── auth.py              # Token authentication
-│   │   ├── database.py          # SQLite session/message storage
-│   │   ├── models.py            # SQLAlchemy/dataclass models
-│   │   ├── agent_client.py      # AI Agent Responses API client (OpenAI-compatible)
-│   │   ├── stt.py               # STT service (OpenAI-compatible /v1/audio/transcriptions)
-│   │   ├── response.py          # Response adaptation (truncate / summarize)
-│   │   └── routers/
-│   │       ├── health.py
-│   │       ├── sessions.py      # Session CRUD
-│   │       └── messages.py      # Message + audio endpoints
-│   ├── Dockerfile
-│   └── README.md
-├── app/                         # Even Hub App (TypeScript)
-│   ├── package.json             # even-toolkit + @evenrealities/even_hub_sdk
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   ├── app.json                 # Even Hub manifest
-│   ├── src/
-│   │   ├── main.ts              # Bridge init, event routing, page management
-│   │   ├── screens/             # Per-screen modules (even-toolkit screen router)
-│   │   │   ├── splash.ts        # Splash screen (disabled)
-│   │   │   ├── home.ts          # Home menu (new session, sessions)
-│   │   │   ├── sessions.ts      # Session list browser
-│   │   │   └── chat.ts          # Chat display with AI responses
-│   │   ├── state.ts             # App state management
-│   │   ├── audio.ts             # PCM capture + VAD + WAV conversion
-│   │   ├── api.ts               # Bridge API client (fetch wrapper)
-│   │   └── webui.ts             # Phone WebUI (companion settings via even-toolkit web components)
-│   └── README.md
+├── .gitlab-ci.yml               # CI pipeline (lint, typecheck, test, build)
+├── .gitignore
 ├── ARCHITECTURE.md              # This file
+├── CONTRIBUTING.md              # Dev setup, code style, PR process
+├── docker-compose.example.yml   # Podman Compose example (bridge + STT proxy)
+├── E2E_TEST_PLAN.md             # End-to-end testing guide
+├── LICENSE                      # MIT
 ├── README.md                    # Project overview + quickstart
-└── .gitignore
+├── ROADMAP.md                   # Development roadmap
+├── bridge/                      # G2 Bridge Server (Python)
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── pyproject.toml           # Dependencies (FastAPI, httpx, aiosqlite, etc.)
+│   ├── README.md                # Setup, configuration reference, env vars
+│   ├── src/
+│   │   └── g2_bridge/
+│   │       ├── __init__.py
+│   │       ├── main.py          # FastAPI app entry point
+│   │       ├── config.py        # Configuration (env vars)
+│   │       ├── auth.py          # Token authentication
+│   │       ├── database.py      # SQLite session/message storage
+│   │       ├── models.py        # SQLAlchemy/dataclass models
+│   │       ├── agent_client.py  # AI Agent Responses API client (OpenAI-compatible)
+│   │       ├── stt_client.py    # STT client (OpenAI-compatible /v1/audio/transcriptions)
+│   │       ├── response.py      # Response adaptation (truncate / summarize)
+│   │       └── routers/
+│   │           ├── __init__.py
+│   │           ├── health.py    # Health check endpoint
+│   │           ├── sessions.py  # Session CRUD
+│   │           ├── messages.py  # Text message endpoint
+│   │           └── audio.py     # Audio upload + STT endpoint
+│   └── tests/
+│       ├── conftest.py
+│       ├── test_agent_client.py
+│       ├── test_audio.py
+│       ├── test_audio_endpoint.py
+│       ├── test_auth.py
+│       ├── test_config_models.py
+│       ├── test_database.py
+│       ├── test_health.py
+│       ├── test_messages.py
+│       ├── test_response.py
+│       ├── test_response_edge_cases.py
+│       └── test_sessions.py
+└── app/                         # Even Hub App (TypeScript)
+    ├── .gitignore
+    ├── app.json                 # Even Hub manifest
+    ├── eslint.config.js
+    ├── index.html
+    ├── package.json             # even-toolkit + @evenrealities/even_hub_sdk
+    ├── README.md                # Sideload, Even Hub submission, troubleshooting
+    ├── tsconfig.json
+    ├── vite.config.ts
+    └── src/
+        ├── main.tsx             # Entry point (React root)
+        ├── App.tsx              # Routes + layouts
+        ├── app.css              # Global styles
+        ├── types.ts             # Domain types (Session, ChatMessage, etc.)
+        ├── api.ts               # Bridge API client (fetch wrapper)
+        ├── storage.ts           # Persistent settings (localStorage)
+        ├── vite-env.d.ts        # Vite type declarations
+        ├── contexts/
+        │   └── AppContext.tsx   # App state (sessions, chat, config)
+        ├── audio/
+        │   ├── index.ts         # Audio module exports
+        │   ├── recorder.ts      # VAD + PCM capture
+        │   └── even-bridge.ts   # EvenAppBridge wrapper
+        ├── glass/               # Glasses display layer (even-toolkit)
+        │   ├── shared.ts        # Snapshot + Actions types
+        │   ├── selectors.ts     # Screen router wiring
+        │   ├── splash.ts        # Splash screen (disabled)
+        │   ├── AppGlasses.tsx   # useGlasses hook integration
+        │   ├── ui-helpers.ts    # G2 display helpers
+        │   └── screens/
+        │       ├── home.ts      # Home menu (glasses)
+        │       ├── sessions.ts  # Session browser (glasses)
+        │       └── chat.ts      # Chat display (glasses)
+        ├── screens/             # Phone WebUI screens (React)
+        │   ├── ChatScreen.tsx   # Chat WebUI (phone)
+        │   ├── SessionsScreen.tsx # Session browser WebUI (phone)
+        │   └── Settings.tsx     # Settings WebUI (phone)
+        └── __tests__/
+            ├── api.test.ts
+            ├── audio.test.ts
+            ├── logic.test.ts
+            └── storage.test.ts
 ```
 
 ## Deployment
