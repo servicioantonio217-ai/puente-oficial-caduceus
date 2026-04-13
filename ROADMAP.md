@@ -115,7 +115,7 @@ Each phase is self-contained and testable independently.
 
 - [x] Session rename from WebUI
 - [x] Session delete from WebUI (works, needs glasses confirmation UX)
-- [ ] TTS for AI responses (phone/Bluetooth headset — G2 has no speaker)
+- ~~TTS for AI responses~~ — **Intentionally not implemented.** The G2 has no speaker. Audio output to phone/Bluetooth headset was evaluated and explicitly rejected — it adds complexity without being the core use case (voice input, visual output). This decision is final and will not be revisited.
 
 ### Documentation
 
@@ -144,4 +144,4 @@ Each phase is self-contained and testable independently.
 - [x] Phase 1 — Bridge MVP
 - [x] Phase 2 — App Scaffold
 - [x] Phase 3 — Voice Pipeline (bridge + app wiring done, E2E hardware test pending)
-- [x] Phase 4 — Quality & OSS Readiness (all items complete except TTS which is deferred post-release)
+- [x] Phase 4 — Quality & OSS Readiness (all items complete; TTS intentionally not implemented — see Phase 4 Notes)
