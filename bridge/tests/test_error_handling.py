@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import httpx
-import pytest
 
 from g2_bridge.auth import classify_httpx_error
 
@@ -29,7 +28,7 @@ class TestClassifyHttpxError:
         assert "timed out" in detail.lower()
 
     def test_read_timeout(self):
-        status, detail = classify_httpx_error(httpx.ReadTimeout("read timed out"))
+        status, _detail = classify_httpx_error(httpx.ReadTimeout("read timed out"))
         assert status == 504
 
     def test_http_status_error_401(self):
@@ -70,7 +69,10 @@ async def test_agent_failure_does_not_store_user_message(app_with_state, client)
     session_id = created.json()["id"]
 
     with patch.object(
-        agent, "send_message", new_callable=AsyncMock, side_effect=httpx.ConnectError("connection refused")
+        agent,
+        "send_message",
+        new_callable=AsyncMock,
+        side_effect=httpx.ConnectError("connection refused"),
     ):
         response = await client.post(
             f"/v1/sessions/{session_id}/message",
