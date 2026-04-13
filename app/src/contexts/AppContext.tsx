@@ -12,6 +12,7 @@ import type { Session, ChatMessage, BridgeConfig, AgentResponse } from '../types
 import * as api from '../api'
 import { loadConfig, saveConfig } from '../storage'
 import { EvenAudioBridge } from '../audio'
+import { setupLifecycle } from '../lifecycle'
 
 interface AppContextValue {
   config: BridgeConfig
@@ -288,6 +289,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (config.url && config.token) {
       connect()
     }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Foreground/background lifecycle: keep-alive, cleanup recording, reconnect
+  useEffect(() => {
+    return setupLifecycle({
+      keepAliveIntervalMs: 30_000,
+      onForeground: () => {
+        // Re-check bridge health when returning to foreground
+        if (config.url && config.token) {
+          connect()
+        }
+      },
+      onBackground: () => {
+        // Stop any active recording to free audio resources
+        if (isRecording) {
+          stopRecording()
+        }
+      },
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
