@@ -10,12 +10,12 @@ export function SessionsScreen() {
 
   const handleNew = () => {
     newSession()
-    navigate('/chat')
+    navigate('/')
   }
 
   const handleOpen = (session: Session) => {
     openSession(session)
-    navigate('/chat')
+    navigate('/')
   }
 
   return (

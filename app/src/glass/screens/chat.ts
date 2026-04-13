@@ -7,10 +7,8 @@ import type { AppSnapshot, AppActions } from '../shared'
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Header format: "Record · 0 Messages" (shows available action)
- *   When recording: "Recording · 0 Messages" (status replaces action)
- *   When processing: "Thinking · 0 Messages"
- *   When offline: "Offline · 0 Messages"
+ * Header format: "Idle · 0 Messages"
+ *   States: Idle, Recording, Thinking, Offline
  *
  * No separate ActionBar — the header conveys state, tap triggers record.
  *
@@ -27,15 +25,15 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     const msgCount = snapshot.chatLines.length
 
     // Action-aware header label:
-    // - "Record" = available action (idle + connected)
-    // - "Recording" = active recording (replaces action)
+    // - "Idle" = connected, no action in progress
+    // - "Recording" = active recording
     // - "Thinking" = processing AI response
     // - "Offline" = no connection
     let actionLabel: string
     if (!snapshot.connected) actionLabel = 'Offline'
     else if (snapshot.isRecording) actionLabel = 'Recording'
     else if (snapshot.isProcessing) actionLabel = 'Thinking'
-    else actionLabel = 'Record'
+    else actionLabel = 'Idle'
 
     const title = fieldJoin(actionLabel, `${msgCount} Messages`)
 

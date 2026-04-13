@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
 import { ChatContainer, ChatInput } from 'even-toolkit/web'
 import type { ChatMessage } from 'even-toolkit/web'
 import { useApp } from '../contexts/AppContext'
@@ -7,7 +6,6 @@ import { useApp } from '../contexts/AppContext'
 export function ChatScreen() {
   const { currentSession, messages, isLoading, error, sendText, newSession } = useApp()
   const [inputValue, setInputValue] = useState('')
-  const navigate = useNavigate()
 
   const handleSend = () => {
     const trimmed = inputValue.trim()
@@ -40,19 +38,10 @@ export function ChatScreen() {
         <div className="text-center space-y-3">
           <p className="text-text-dim">No session selected</p>
           <button
-            onClick={async () => {
-              await newSession()
-            }}
+            onClick={() => newSession()}
             className="px-4 py-2 bg-accent text-white rounded-lg text-sm"
           >
             Start new session
-          </button>
-          <br />
-          <button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 text-text-dim text-sm underline"
-          >
-            Back to home
           </button>
         </div>
       </div>

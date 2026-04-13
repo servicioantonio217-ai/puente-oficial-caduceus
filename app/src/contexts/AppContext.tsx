@@ -42,28 +42,33 @@ const AppContext = createContext<AppContextValue | null>(null)
 /**
  * Extract assistant text from an AgentResponse with multiple fallback strategies.
  *
- * Strategy 1: OpenAI Responses API format — output[].content[].text (type='output_text')
- * Strategy 2: OpenAI Chat Completions format — output[].content[].text (any type)
- * Strategy 3: Direct text on output items — output[].text
- * Strategy 4: Stringified response as last resort (dev debugging)
+ * Strategy 1: OpenAI Responses API format — output[].content[].text (any type)
+ * Strategy 2: Direct text on output items — output[].text
  */
 function extractAssistantText(response: AgentResponse): string {
   let text = ''
 
-  // Strategy 1 & 2: Walk output items for text content
-  for (const item of response.output ?? []) {
+  if (!response.output || response.output.length === 0) {
+    console.warn('[Caduceus] Empty output in agent response:', JSON.stringify(response).slice(0, 200))
+    return ''
+  }
+
+  for (const item of response.output) {
     if (item.content && Array.isArray(item.content)) {
       for (const part of item.content) {
-        // Accept any type that has text, not just 'output_text'
         if (part.text) {
           text += part.text
         }
       }
     }
-    // Strategy 3: Direct text property (some API variants)
+    // Fallback: direct text property (some API variants)
     if (!item.content && (item as unknown as Record<string, unknown>).text) {
       text += String((item as unknown as Record<string, unknown>).text)
     }
+  }
+
+  if (!text.trim()) {
+    console.warn('[Caduceus] No text extracted from response:', JSON.stringify(response.output).slice(0, 300))
   }
 
   return text.trim()
