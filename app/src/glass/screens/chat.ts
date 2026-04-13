@@ -1,15 +1,18 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { calcMaxScroll } from 'even-toolkit/glass-nav'
 import { buildChatDisplay } from 'even-toolkit/glass-chat-display'
-import { buildStaticActionBar } from 'even-toolkit/action-bar'
 import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
 
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Header format: "Idle · 0 Messages"
- *   States: Idle, Listening, Thinking, Offline
+ * Header format: "Record · 0 Messages" (shows available action)
+ *   When recording: "Recording · 0 Messages" (status replaces action)
+ *   When processing: "Thinking · 0 Messages"
+ *   When offline: "Offline · 0 Messages"
+ *
+ * No separate ActionBar — the header conveys state, tap triggers record.
  *
  * Layout (10 lines):
  *   Header + separator (2 lines, always visible)
@@ -23,23 +26,29 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
     const msgCount = snapshot.chatLines.length
 
-    // Status label
-    let status: string
-    if (!snapshot.connected) status = 'Offline'
-    else if (snapshot.isRecording) status = 'Listening'
-    else if (snapshot.isProcessing) status = 'Thinking'
-    else status = 'Idle'
+    // Action-aware header label:
+    // - "Record" = available action (idle + connected)
+    // - "Recording" = active recording (replaces action)
+    // - "Thinking" = processing AI response
+    // - "Offline" = no connection
+    let actionLabel: string
+    if (!snapshot.connected) actionLabel = 'Offline'
+    else if (snapshot.isRecording) actionLabel = 'Recording'
+    else if (snapshot.isProcessing) actionLabel = 'Thinking'
+    else actionLabel = 'Record'
 
-    const title = fieldJoin(status, `${msgCount} Messages`)
+    const title = fieldJoin(actionLabel, `${msgCount} Messages`)
 
     // Empty state — clean, no prefix (type 'text' = no prefix in even-toolkit)
     const lines = msgCount > 0
       ? snapshot.chatLines
       : [{ type: 'text' as const, text: '[ Tap to record ]' }]
 
+    // actionBar is required by buildChatDisplay but we don't want a visible bar.
+    // Passing a single space renders as empty — satisfies the type without UI clutter.
     return buildChatDisplay({
       title,
-      actionBar: buildStaticActionBar(['Record'], 0),
+      actionBar: ' ',
       chatLines: lines,
       scrollOffset: nav.highlightedIndex,
       contentSlots: CONTENT_SLOTS,
