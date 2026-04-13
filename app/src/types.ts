@@ -25,9 +25,9 @@ export interface AgentResponse {
 }
 
 export interface AgentOutputItem {
-  type: 'message'
-  role: 'assistant'
-  content: { type: 'output_text'; text: string }[]
+  type: string
+  role: string
+  content: { type: string; text: string }[]
 }
 
 /** Bridge connection settings (persisted in localStorage). */
