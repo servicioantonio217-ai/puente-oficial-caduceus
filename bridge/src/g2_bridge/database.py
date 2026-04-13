@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -61,79 +64,125 @@ class Database:
     async def create_session(
         self, session_id: str, name: str, agent_conversation_id: str, now: str
     ) -> None:
-        await self.connection.execute(
-            "INSERT INTO sessions (id, name, created_at, updated_at, agent_conversation_id) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (session_id, name, now, now, agent_conversation_id),
-        )
-        await self.connection.commit()
+        try:
+            await self.connection.execute(
+                "INSERT INTO sessions (id, name, created_at, updated_at, agent_conversation_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (session_id, name, now, now, agent_conversation_id),
+            )
+            await self.connection.commit()
+        except Exception:
+            logger.error("Failed to create session %s", session_id, exc_info=True)
+            raise
 
     async def list_sessions(self) -> list[dict[str, Any]]:
-        cursor = await self.connection.execute(
-            "SELECT s.id, s.name, s.created_at, s.updated_at, "
-            "COUNT(m.id) AS message_count "
-            "FROM sessions s LEFT JOIN messages m ON m.session_id = s.id "
-            "GROUP BY s.id ORDER BY s.updated_at DESC"
-        )
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+        try:
+            cursor = await self.connection.execute(
+                "SELECT s.id, s.name, s.created_at, s.updated_at, "
+                "COUNT(m.id) AS message_count "
+                "FROM sessions s LEFT JOIN messages m ON m.session_id = s.id "
+                "GROUP BY s.id ORDER BY s.updated_at DESC"
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception:
+            logger.error("Failed to list sessions", exc_info=True)
+            raise
 
     async def get_session(self, session_id: str) -> dict[str, Any] | None:
-        cursor = await self.connection.execute(
-            "SELECT s.id, s.name, s.created_at, s.updated_at, "
-            "COUNT(m.id) AS message_count "
-            "FROM sessions s LEFT JOIN messages m ON m.session_id = s.id "
-            "WHERE s.id = ? GROUP BY s.id",
-            (session_id,),
-        )
-        row = await cursor.fetchone()
-        return dict(row) if row else None
+        try:
+            cursor = await self.connection.execute(
+                "SELECT s.id, s.name, s.created_at, s.updated_at, "
+                "COUNT(m.id) AS message_count "
+                "FROM sessions s LEFT JOIN messages m ON m.session_id = s.id "
+                "WHERE s.id = ? GROUP BY s.id",
+                (session_id,),
+            )
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+        except Exception:
+            logger.error("Failed to get session %s", session_id, exc_info=True)
+            raise
 
     async def get_agent_conversation_id(self, session_id: str) -> str | None:
-        cursor = await self.connection.execute(
-            "SELECT agent_conversation_id FROM sessions WHERE id = ?",
-            (session_id,),
-        )
-        row = await cursor.fetchone()
-        return dict(row)["agent_conversation_id"] if row else None
+        try:
+            cursor = await self.connection.execute(
+                "SELECT agent_conversation_id FROM sessions WHERE id = ?",
+                (session_id,),
+            )
+            row = await cursor.fetchone()
+            return dict(row)["agent_conversation_id"] if row else None
+        except Exception:
+            logger.error(
+                "Failed to get agent conversation id for %s",
+                session_id,
+                exc_info=True,
+            )
+            raise
 
     async def update_session_timestamp(self, session_id: str, now: str) -> None:
-        await self.connection.execute(
-            "UPDATE sessions SET updated_at = ? WHERE id = ?",
-            (now, session_id),
-        )
-        await self.connection.commit()
+        try:
+            await self.connection.execute(
+                "UPDATE sessions SET updated_at = ? WHERE id = ?",
+                (now, session_id),
+            )
+            await self.connection.commit()
+        except Exception:
+            logger.error(
+                "Failed to update session timestamp for %s",
+                session_id,
+                exc_info=True,
+            )
+            raise
 
     async def rename_session(self, session_id: str, name: str, now: str) -> bool:
-        cursor = await self.connection.execute(
-            "UPDATE sessions SET name = ?, updated_at = ? WHERE id = ?",
-            (name, now, session_id),
-        )
-        await self.connection.commit()
-        return cursor.rowcount > 0
+        try:
+            cursor = await self.connection.execute(
+                "UPDATE sessions SET name = ?, updated_at = ? WHERE id = ?",
+                (name, now, session_id),
+            )
+            await self.connection.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            logger.error("Failed to rename session %s", session_id, exc_info=True)
+            raise
 
     async def delete_session(self, session_id: str) -> bool:
-        cursor = await self.connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-        await self.connection.commit()
-        return cursor.rowcount > 0
+        try:
+            cursor = await self.connection.execute(
+                "DELETE FROM sessions WHERE id = ?", (session_id,)
+            )
+            await self.connection.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            logger.error("Failed to delete session %s", session_id, exc_info=True)
+            raise
 
     # --- Message operations ---
 
     async def add_message(
         self, message_id: str, session_id: str, role: str, content: str, now: str
     ) -> None:
-        await self.connection.execute(
-            "INSERT INTO messages (id, session_id, role, content, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (message_id, session_id, role, content, now),
-        )
-        await self.connection.commit()
+        try:
+            await self.connection.execute(
+                "INSERT INTO messages (id, session_id, role, content, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (message_id, session_id, role, content, now),
+            )
+            await self.connection.commit()
+        except Exception:
+            logger.error("Failed to add message to session %s", session_id, exc_info=True)
+            raise
 
     async def get_messages(self, session_id: str) -> list[dict[str, Any]]:
-        cursor = await self.connection.execute(
-            "SELECT id, role, content, created_at FROM messages "
-            "WHERE session_id = ? ORDER BY created_at ASC",
-            (session_id,),
-        )
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+        try:
+            cursor = await self.connection.execute(
+                "SELECT id, role, content, created_at FROM messages "
+                "WHERE session_id = ? ORDER BY created_at ASC",
+                (session_id,),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception:
+            logger.error("Failed to get messages for session %s", session_id, exc_info=True)
+            raise

@@ -276,6 +276,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     audioBridgeRef.current = null
   }, [])
 
+  // Auto-dismiss errors after 8 seconds
+  useEffect(() => {
+    if (!error) return
+    const timer = setTimeout(() => setError(null), 8000)
+    return () => clearTimeout(timer)
+  }, [error])
+
   // Auto-connect on mount if config exists
   useEffect(() => {
     if (config.url && config.token) {

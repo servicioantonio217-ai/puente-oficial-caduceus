@@ -9,7 +9,12 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Request, UploadFile
 
 from g2_bridge.agent_client import AgentClient
-from g2_bridge.auth import AuthError, verify_agent_configured, verify_client_token
+from g2_bridge.auth import (
+    AuthError,
+    classify_httpx_error,
+    verify_agent_configured,
+    verify_client_token,
+)
 from g2_bridge.database import Database
 from g2_bridge.models import AudioResponse
 from g2_bridge.response import truncate_response
@@ -72,18 +77,14 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
     if not transcript:
         raise AuthError(status_code=422, detail="STT returned empty transcript")
 
-    # Store user message (transcript)
-    now = _now_iso()
-    await db.add_message(str(uuid.uuid4()), session_id, "user", transcript, now)
-    await db.update_session_timestamp(session_id, now)
-
-    # Forward transcript to AI Agent
+    # Forward transcript to AI Agent BEFORE storing messages
     conversation_id = await db.get_agent_conversation_id(session_id)
     try:
         raw_response = await agent.send_message(transcript, conversation_id)
     except Exception as e:
         logger.error("Agent request failed: %s", e)
-        raise AuthError(status_code=502, detail=f"Agent request failed: {e}") from e
+        status_code, detail = classify_httpx_error(e)
+        raise AuthError(status_code=status_code, detail=detail) from e
 
     agent_response = agent.parse_response(raw_response)
 
@@ -92,6 +93,11 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
     for msg in agent_response.output:
         for content in msg.content:
             response_text += content.text
+
+    # Store both messages only after agent succeeds
+    now = _now_iso()
+    await db.add_message(str(uuid.uuid4()), session_id, "user", transcript, now)
+    await db.update_session_timestamp(session_id, now)
 
     # Store assistant message (adapted/truncated version)
     adapted_text = truncate_response(response_text, settings.max_response_chars)

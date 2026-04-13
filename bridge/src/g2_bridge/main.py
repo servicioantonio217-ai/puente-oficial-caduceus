@@ -73,6 +73,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def auth_exception_handler(request: Request, exc: AuthError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.error("Unhandled exception: %s", exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+
     # Register CORS middleware (must be before routers)
     app.add_middleware(
         CORSMiddleware,

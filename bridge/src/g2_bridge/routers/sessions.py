@@ -136,6 +136,8 @@ async def rename_session(
         raise AuthError(status_code=404, detail="Session not found")
 
     session = await db.get_session(session_id)
+    if session is None:
+        raise AuthError(status_code=404, detail="Session not found after rename")
     return SessionResponse(
         id=session["id"],
         name=session["name"],
