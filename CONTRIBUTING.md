@@ -6,6 +6,16 @@ Thanks for your interest in G2 Caduceus!
 
 See the [project README](README.md#quick-start) for bridge and app setup instructions.
 
+## Testing on Hardware
+
+To test on G2 glasses during development, use QR code sideloading with hot-reload. See [QR_SIDELOAD_WORKFLOW.md](QR_SIDELOAD_WORKFLOW.md) for the full step-by-step guide, prerequisites, and troubleshooting.
+
+For UI layout testing without hardware, use the Even Hub simulator:
+
+```bash
+npx @evenrealities/evenhub-simulator@latest http://localhost:5173
+```
+
 ## Code Style
 
 ### Bridge (Python)
