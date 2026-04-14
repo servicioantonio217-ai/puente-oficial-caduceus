@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     max_response_chars: int = 500  # G2_MAX_RESPONSE_CHARS
     max_audio_bytes: int = 5 * 1024 * 1024  # G2_MAX_AUDIO_BYTES — 5 MB limit
 
+    # Conversation context
+    max_context_messages: int = 50  # G2_MAX_CONTEXT_MESSAGES — max history sent to agent
+
     @property
     def is_configured(self) -> bool:
         """Check if required settings are present."""

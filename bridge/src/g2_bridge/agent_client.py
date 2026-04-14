@@ -1,4 +1,4 @@
-"""AI Agent client — OpenAI Responses API compatible."""
+"""AI Agent client — OpenAI Chat Completions API compatible."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class AgentClient:
-    """Async client for the AI Agent Responses API."""
+    """Async client for the AI Agent Chat Completions API."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -31,16 +31,30 @@ class AgentClient:
         await self._client.aclose()
 
     async def send_message(
-        self, content: str, conversation_id: str | None = None
+        self,
+        content: str,
+        history: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
-        """Send a message to the AI Agent and return the raw response.
+        """Send a message to the AI Agent with conversation history.
 
         Uses the OpenAI Chat Completions API format:
         POST /chat/completions with { model, messages, stream: false }
+
+        Args:
+            content: The current user message.
+            history: Prior messages as [{"role": "user"|"assistant", "content": "..."}].
+                     These are included before the current message so the agent
+                     has full conversation context.
         """
         messages: list[dict[str, str]] = []
         if self.settings.agent_instructions:
             messages.append({"role": "system", "content": self.settings.agent_instructions})
+
+        # Include conversation history (prior turns)
+        if history:
+            messages.extend(history)
+
+        # Current user message
         messages.append({"role": "user", "content": content})
 
         payload: dict[str, Any] = {
@@ -49,7 +63,10 @@ class AgentClient:
             "stream": False,
         }
 
-        logger.debug("Sending to agent: %s", payload)
+        logger.debug(
+            "Sending to agent: %d history messages + 1 current",
+            len(history) if history else 0,
+        )
         response = await self._client.post("/chat/completions", json=payload)
 
         if response.status_code != 200:
