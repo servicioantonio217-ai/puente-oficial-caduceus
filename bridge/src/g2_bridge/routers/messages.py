@@ -15,6 +15,7 @@ from g2_bridge.auth import (
     verify_agent_configured,
     verify_client_token,
 )
+from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.models import AgentResponse, SendMessageRequest
 from g2_bridge.response import truncate_response
@@ -51,10 +52,13 @@ async def send_message(
     if session is None:
         raise AuthError(status_code=404, detail="Session not found")
 
+    # Load conversation history from DB
+    stored_messages = await db.get_messages(session_id)
+    history = build_history(stored_messages, settings.max_context_messages)
+
     # Forward to AI Agent BEFORE storing messages to avoid orphans
-    conversation_id = await db.get_agent_conversation_id(session_id)
     try:
-        raw_response = await agent.send_message(body.content, conversation_id)
+        raw_response = await agent.send_message(body.content, history=history)
     except Exception as e:
         logger.error("Agent request failed: %s", e)
         status_code, detail = classify_httpx_error(e)

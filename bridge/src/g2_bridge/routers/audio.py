@@ -15,6 +15,7 @@ from g2_bridge.auth import (
     verify_agent_configured,
     verify_client_token,
 )
+from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.models import AudioResponse
 from g2_bridge.response import truncate_response
@@ -77,10 +78,13 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
     if not transcript:
         raise AuthError(status_code=422, detail="STT returned empty transcript")
 
+    # Load conversation history from DB
+    stored_messages = await db.get_messages(session_id)
+    history = build_history(stored_messages, settings.max_context_messages)
+
     # Forward transcript to AI Agent BEFORE storing messages
-    conversation_id = await db.get_agent_conversation_id(session_id)
     try:
-        raw_response = await agent.send_message(transcript, conversation_id)
+        raw_response = await agent.send_message(transcript, history=history)
     except Exception as e:
         logger.error("Agent request failed: %s", e)
         status_code, detail = classify_httpx_error(e)

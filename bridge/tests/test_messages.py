@@ -160,3 +160,67 @@ async def test_message_persists_in_session_history(app_with_state, client):
     assert data["messages"][0]["role"] == "user"
     assert data["messages"][0]["content"] == "Hello!"
     assert data["messages"][1]["role"] == "assistant"
+
+
+async def test_conversation_history_passed_to_agent(app_with_state, client):
+    """Second message in a session should include prior messages as history."""
+    _app, _db, agent = app_with_state
+
+    created = await client.post("/v1/sessions", headers=HEADERS, json={})
+    session_id = created.json()["id"]
+
+    # First message — no history yet
+    with patch.object(
+        agent, "send_message", new_callable=AsyncMock, return_value=MOCK_AGENT_RESPONSE
+    ) as mock_send:
+        await client.post(
+            f"/v1/sessions/{session_id}/message",
+            headers=HEADERS,
+            json={"content": "First question"},
+        )
+
+    # Verify first call had no (empty) history
+    first_call = mock_send.call_args
+    assert first_call.kwargs.get("history") == [] or first_call[0].__len__() < 2
+
+    # Second message — should now have history
+    with patch.object(
+        agent, "send_message", new_callable=AsyncMock, return_value=MOCK_AGENT_RESPONSE
+    ) as mock_send:
+        await client.post(
+            f"/v1/sessions/{session_id}/message",
+            headers=HEADERS,
+            json={"content": "Follow-up question"},
+        )
+
+    second_call = mock_send.call_args
+    history = second_call.kwargs.get("history", second_call[1].get("history"))
+    assert history is not None
+    assert len(history) == 2  # user + assistant from first exchange
+    assert history[0]["role"] == "user"
+    assert history[0]["content"] == "First question"
+    assert history[1]["role"] == "assistant"
+    assert history[1]["content"] == "Hello from the AI agent!"
+
+
+async def test_conversation_history_grows_across_turns(app_with_state, client):
+    """History accumulates across multiple turns in the same session."""
+    _app, _db, agent = app_with_state
+
+    created = await client.post("/v1/sessions", headers=HEADERS, json={})
+    session_id = created.json()["id"]
+
+    # Send 3 messages
+    for i in range(3):
+        with patch.object(
+            agent, "send_message", new_callable=AsyncMock, return_value=MOCK_AGENT_RESPONSE
+        ) as mock_send:
+            await client.post(
+                f"/v1/sessions/{session_id}/message",
+                headers=HEADERS,
+                json={"content": f"Message {i}"},
+            )
+
+        history = mock_send.call_args.kwargs.get("history", [])
+        # After turn 0: 0 history, turn 1: 2 history, turn 2: 4 history
+        assert len(history) == i * 2

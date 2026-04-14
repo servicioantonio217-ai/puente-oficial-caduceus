@@ -159,3 +159,110 @@ class TestSendMessageWithInstructions:
         assert all(m["role"] != "system" for m in payload["messages"])
         assert payload["messages"][0]["role"] == "user"
         await client.close()
+
+
+class TestSendMessageWithHistory:
+    @pytest.mark.asyncio
+    async def test_send_message_includes_history(self):
+        """History messages should appear between system prompt and current message."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        settings = Settings(
+            agent_api_key="test",
+            agent_api_url="http://localhost:9999/v1",
+            agent_instructions="You are helpful.",
+        )
+        client = AgentClient(settings)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "r",
+            "choices": [
+                {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"},
+            ],
+            "usage": {},
+        }
+
+        history = [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello!"},
+            {"role": "user", "content": "How are you?"},
+        ]
+
+        with patch.object(
+            client._client, "post", new_callable=AsyncMock, return_value=mock_response
+        ) as mock_post:
+            await client.send_message("Good!", history=history)
+
+        call_args = mock_post.call_args
+        payload = call_args.kwargs["json"]
+        msgs = payload["messages"]
+
+        # system + 3 history + 1 current = 5
+        assert len(msgs) == 5
+        assert msgs[0]["role"] == "system"
+        assert msgs[1]["content"] == "Hi"
+        assert msgs[2]["content"] == "Hello!"
+        assert msgs[3]["content"] == "How are you?"
+        assert msgs[4]["role"] == "user"
+        assert msgs[4]["content"] == "Good!"
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_send_message_without_history(self):
+        """When history is None, only system prompt + user message are sent."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        settings = Settings(agent_api_key="test", agent_api_url="http://localhost:9999/v1")
+        client = AgentClient(settings)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "r",
+            "choices": [
+                {"message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"},
+            ],
+            "usage": {},
+        }
+
+        with patch.object(
+            client._client, "post", new_callable=AsyncMock, return_value=mock_response
+        ) as mock_post:
+            await client.send_message("Hello", history=None)
+
+        call_args = mock_post.call_args
+        payload = call_args.kwargs["json"]
+        assert len(payload["messages"]) == 1
+        assert payload["messages"][0]["role"] == "user"
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_send_message_empty_history(self):
+        """Empty history list is treated same as None."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        settings = Settings(agent_api_key="test", agent_api_url="http://localhost:9999/v1")
+        client = AgentClient(settings)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "r",
+            "choices": [
+                {"message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"},
+            ],
+            "usage": {},
+        }
+
+        with patch.object(
+            client._client, "post", new_callable=AsyncMock, return_value=mock_response
+        ) as mock_post:
+            await client.send_message("Hello", history=[])
+
+        call_args = mock_post.call_args
+        payload = call_args.kwargs["json"]
+        assert len(payload["messages"]) == 1
+        assert payload["messages"][0]["role"] == "user"
+        await client.close()
