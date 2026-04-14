@@ -1,6 +1,26 @@
 """Configuration via environment variables."""
 
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _resolve_tz(tz_name: str) -> ZoneInfo | None:
+    """Resolve a timezone name to a ZoneInfo object.
+
+    Returns None for empty/UTC (caller uses UTC directly).
+    Raises ValueError for invalid timezone names.
+    """
+    if not tz_name or tz_name.upper() == "UTC":
+        return None
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError as exc:
+        msg = f"Invalid timezone: {tz_name!r}"
+        raise ValueError(msg) from exc
 
 
 class Settings(BaseSettings):
@@ -37,6 +57,13 @@ class Settings(BaseSettings):
     # Conversation context
     max_context_messages: int = 50  # G2_MAX_CONTEXT_MESSAGES — max history sent to agent
 
+    # Display
+    timezone: str = "UTC"  # G2_TIMEZONE — IANA timezone for timestamps (e.g. Europe/Vienna)
+
+    def model_post_init(self, __context: object) -> None:
+        """Validate timezone setting after model initialization."""
+        _resolve_tz(self.timezone)  # Raises ValueError if invalid
+
     @property
     def is_configured(self) -> bool:
         """Check if required settings are present."""
@@ -46,3 +73,19 @@ class Settings(BaseSettings):
     def stt_configured(self) -> bool:
         """Check if STT endpoint is configured."""
         return bool(self.stt_api_url)
+
+    def convert_utc_to_local(self, utc_iso: str) -> str:
+        """Convert a UTC ISO timestamp to the configured local timezone.
+
+        Input: '2026-04-14T20:30:00+00:00' or '2026-04-14T20:30:00.123456+00:00'
+        Output: same format but in configured timezone, or unchanged if UTC.
+        """
+        tz = _resolve_tz(self.timezone)
+        if tz is None:
+            return utc_iso  # Already UTC or no conversion needed
+
+        dt = datetime.fromisoformat(utc_iso)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        local_dt = dt.astimezone(tz)
+        return local_dt.isoformat()
