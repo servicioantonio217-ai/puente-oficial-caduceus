@@ -4,6 +4,36 @@ import type { Session } from '../types'
 import { Button } from 'even-toolkit/web'
 import { IcPlus } from 'even-toolkit/web/icons/svg-icons'
 
+/**
+ * Format an ISO timestamp to a human-readable local-time string.
+ *
+ * Shows "Today HH:MM", "Yesterday HH:MM", or "MMM DD, HH:MM" for older sessions.
+ */
+function formatSessionTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    const now = new Date()
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    const time = `${hh}:${mi}`
+
+    const isToday = d.toDateString() === now.toDateString()
+    if (isToday) return `Today ${time}`
+
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const isYesterday = d.toDateString() === yesterday.toDateString()
+    if (isYesterday) return `Yesterday ${time}`
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return `${months[d.getMonth()]} ${d.getDate()}, ${time}`
+  } catch {
+    return ''
+  }
+}
+
 export function SessionsScreen() {
   const { sessions, openSession, removeSession, renameSession, newSession, isLoading } = useApp()
   const navigate = useNavigate()
@@ -48,6 +78,8 @@ export function SessionsScreen() {
                     {session.name ?? session.id.slice(0, 8)}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
+                    {formatSessionTime(session.updated_at)}
+                    {session.updated_at && session.message_count ? ' · ' : ''}
                     {session.message_count ?? 0} messages
                   </p>
                 </div>
