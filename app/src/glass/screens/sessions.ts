@@ -62,7 +62,9 @@ export const sessionsScreen: GlassScreen<AppSnapshot, AppActions> = {
     if (action.type === 'SELECT_HIGHLIGHTED') {
       const sessions = snapshot.sessions.slice(0, MAX_SESSIONS)
       if (sessions[nav.highlightedIndex]) {
-        ctx.openSession(sessions[nav.highlightedIndex])
+        // openSession() is async — catch to prevent unhandled rejection.
+        // Screen switches immediately; session load completes in background.
+        ctx.openSession(sessions[nav.highlightedIndex]).catch(() => {})
         // Explicitly switch to chat screen — don't rely on deriveScreen
         return { ...nav, screen: 'chat', highlightedIndex: 0 }
       }
