@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { SettingsGroup, ListItem, Input, Button } from 'even-toolkit/web'
 import { useApp } from '../contexts/AppContext'
 import type { BridgeConfig } from '../types'
 
 export function Settings() {
+  const navigate = useNavigate()
   const { config, setConfig, connected, connect, disconnect } = useApp()
   const [url, setUrl] = useState(config.url)
   const [token, setToken] = useState(config.token)
@@ -71,15 +73,12 @@ export function Settings() {
         )}
       </SettingsGroup>
 
-      {/* About */}
-      <SettingsGroup label="About">
+      {/* Logs */}
+      <SettingsGroup label="Debug">
         <ListItem
-          title="G2 Caduceus v0.1.0"
-          subtitle="AI chat for G2 smart glasses"
-        />
-        <ListItem
-          title="Bridge API"
-          subtitle="OpenAI Responses API compatible"
+          title="View Logs"
+          subtitle="Console output and debug messages"
+          onPress={() => navigate('/logs')}
         />
       </SettingsGroup>
     </main>

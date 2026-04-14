@@ -5,6 +5,7 @@ import { AppProvider } from './contexts/AppContext'
 import { ChatScreen } from './screens/ChatScreen'
 import { SessionsScreen } from './screens/SessionsScreen'
 import { Settings } from './screens/Settings'
+import { LogScreen } from './screens/LogScreen'
 import { AppGlasses } from './glass/AppGlasses'
 import { useApp } from './contexts/AppContext'
 
@@ -92,6 +93,10 @@ function SettingsLayout() {
   )
 }
 
+function LogsLayout() {
+  return <LogScreen />
+}
+
 export function App() {
   return (
     <AppProvider>
@@ -99,6 +104,7 @@ export function App() {
         <Route path="/" element={<ChatLayout />} />
         <Route path="/sessions" element={<SessionsLayout />} />
         <Route path="/settings" element={<SettingsLayout />} />
+        <Route path="/logs" element={<LogsLayout />} />
       </Routes>
     </AppProvider>
   )

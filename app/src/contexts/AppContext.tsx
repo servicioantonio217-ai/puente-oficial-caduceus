@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, ChatMessage, AgentResponse, BridgeConfig } from '../types'
+import { useLogBuffer, type LogEntry } from '../hooks/useLogBuffer'
 
 /** Generate a UUID v4, with fallback for WebViews without crypto.randomUUID(). */
 function uuid(): string {
@@ -48,6 +49,8 @@ interface AppContextValue {
   sendText: (content: string) => Promise<void>
   startRecording: () => void
   stopRecording: () => void
+  logEntries: LogEntry[]
+  clearLogs: () => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -96,6 +99,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const { entries: logEntries, clear: clearLogs } = useLogBuffer()
 
   const configRef = useRef(config)
   configRef.current = config
@@ -363,6 +368,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         refreshSessions, openSession, closeSession,
         newSession, removeSession, renameSession,
         sendText, startRecording, stopRecording,
+        logEntries, clearLogs,
       }}
     >
       {children}
