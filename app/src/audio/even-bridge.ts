@@ -1,24 +1,33 @@
 /**
- * EvenAppBridge audio integration.
+ * EvenAppBridge audio integration for G2 glasses.
  *
- * Wraps the EvenAppBridge.audioControl API to capture PCM audio
- * from the G2 glasses and feed it to the AudioRecorder.
+ * Uses the Even SDK's internal bridge (window.__evenBridge) to capture
+ * PCM audio from the G2 glasses via EvenHub events.
  *
  * The bridge provides:
- * - bridge.audioControl(true) — start audio capture
- * - bridge.audioControl(false) — stop audio capture
- * - bridge.onAudioData(callback) — receive PCM Float32Array chunks
+ * - __evenBridge.rawBridge.audioControl(true/false) — mic on/off
+ * - __evenBridge.onEvent(callback) — receive events including audioPcm
+ *
+ * Audio format: Uint8Array of 16-bit PCM little-endian at 16kHz.
+ * Converted to Float32Array before feeding to the AudioRecorder.
  */
 
 import type { AudioRecorder } from './recorder'
 
-declare global {
-  interface Window {
-    EvenAppBridge?: {
-      audioControl: (enable: boolean) => void
-      onAudioData?: (callback: (data: Float32Array) => void) => void
-    }
+/** EvenHub bridge interface (set by useGlasses). */
+interface EvenBridge {
+  rawBridge?: {
+    audioControl?: (enable: boolean) => void
+    callEvenApp?: (method: string, params: Record<string, unknown>) => void
   }
+  onEvent: (callback: (event: EvenHubEvent) => void) => void
+}
+
+interface EvenHubEvent {
+  audioEvent?: {
+    audioPcm?: Uint8Array
+  }
+  [key: string]: unknown
 }
 
 export interface EvenAudioOptions {
@@ -29,9 +38,21 @@ export interface EvenAudioOptions {
   onRecordingCancelled: () => void
 }
 
+/** Convert raw bytes (16-bit PCM little-endian) to Float32Array. */
+function pcm16ToFloat32(bytes: Uint8Array): Float32Array {
+  const samples = bytes.length / 2
+  const float32 = new Float32Array(samples)
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  for (let i = 0; i < samples; i++) {
+    float32[i] = view.getInt16(i * 2, true) / 32768
+  }
+  return float32
+}
+
 export class EvenAudioBridge {
   private options: EvenAudioOptions
   private isActive = false
+  private bridge: EvenBridge | null = null
 
   constructor(options: EvenAudioOptions) {
     this.options = options
@@ -41,29 +62,48 @@ export class EvenAudioBridge {
     return this.isActive
   }
 
-  /** Check if EvenAppBridge is available. */
+  /** Check if Even bridge (__evenBridge) is available. */
   isAvailable(): boolean {
-    return typeof window !== 'undefined' && !!window.EvenAppBridge
+    return typeof window !== 'undefined' && !!(window as unknown as Record<string, unknown>).__evenBridge
   }
 
   /** Start voice recording via G2 glasses. */
   start(): void {
     if (this.isActive) return
-    if (!this.isAvailable()) {
-      console.warn('[EvenAudio] EvenAppBridge not available — running in browser mode')
+
+    // Get bridge from global (set by useGlasses)
+    const w = window as unknown as Record<string, unknown>
+    this.bridge = (w.__evenBridge as EvenBridge) ?? null
+
+    if (!this.bridge || !this.isAvailable()) {
+      console.warn('[EvenAudio] __evenBridge not available — running in browser mode')
       return
     }
 
     this.isActive = true
-    const bridge = window.EvenAppBridge!
 
-    // Register audio data callback
-    bridge.onAudioData?.((data: Float32Array) => {
-      this.options.recorder.feedPCMSamples(data)
+    // Open the glasses microphone
+    try {
+      if (this.bridge.rawBridge?.audioControl) {
+        this.bridge.rawBridge.audioControl(true)
+      } else if (this.bridge.rawBridge?.callEvenApp) {
+        this.bridge.rawBridge.callEvenApp('audioControl', { isOpen: true })
+      }
+    } catch (err) {
+      console.warn('[EvenAudio] audioControl(true) failed:', err)
+    }
+
+    // Listen for audio PCM events via the EvenHub event system
+    this.bridge.onEvent((event: EvenHubEvent) => {
+      if (!this.isActive) return
+
+      const audioPcm = event?.audioEvent?.audioPcm
+      if (!audioPcm || audioPcm.length === 0) return
+
+      // Convert 16-bit PCM LE (Uint8Array) to Float32Array
+      const float32 = pcm16ToFloat32(audioPcm)
+      this.options.recorder.feedPCMSamples(float32)
     })
-
-    // Start audio capture
-    bridge.audioControl(true)
 
     // Start the recorder with callbacks
     this.options.recorder.start({
@@ -85,9 +125,17 @@ export class EvenAudioBridge {
   stop(): void {
     if (!this.isActive) return
 
-    const bridge = window.EvenAppBridge
-    if (bridge) {
-      bridge.audioControl(false)
+    // Close the glasses microphone
+    if (this.bridge) {
+      try {
+        if (this.bridge.rawBridge?.audioControl) {
+          this.bridge.rawBridge.audioControl(false)
+        } else if (this.bridge.rawBridge?.callEvenApp) {
+          this.bridge.rawBridge.callEvenApp('audioControl', { isOpen: false })
+        }
+      } catch (err) {
+        console.warn('[EvenAudio] audioControl(false) failed:', err)
+      }
     }
 
     const blob = this.options.recorder.stop()
@@ -106,9 +154,16 @@ export class EvenAudioBridge {
   cancel(): void {
     if (!this.isActive) return
 
-    const bridge = window.EvenAppBridge
-    if (bridge) {
-      bridge.audioControl(false)
+    if (this.bridge) {
+      try {
+        if (this.bridge.rawBridge?.audioControl) {
+          this.bridge.rawBridge.audioControl(false)
+        } else if (this.bridge.rawBridge?.callEvenApp) {
+          this.bridge.rawBridge.callEvenApp('audioControl', { isOpen: false })
+        }
+      } catch (err) {
+        console.warn('[EvenAudio] audioControl(false) failed:', err)
+      }
     }
 
     this.options.recorder.cancel()
