@@ -50,8 +50,15 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
       const idx = nav.highlightedIndex
       if (idx === 0) {
         ctx.newSession()
-        // Explicitly switch to chat screen — don't rely on deriveScreen
-        return { ...nav, screen: 'chat', highlightedIndex: 0 }
+        // Explicitly switch to chat screen — don't rely on deriveScreen.
+        // Track origin so GO_BACK returns to home.
+        return {
+          ...nav,
+          screen: 'chat',
+          highlightedIndex: 0,
+          previousScreen: 'home' as string,
+          previousHighlight: 0,
+        }
       } else if (idx === 1) {
         return { ...nav, screen: 'sessions', highlightedIndex: 0 }
       }

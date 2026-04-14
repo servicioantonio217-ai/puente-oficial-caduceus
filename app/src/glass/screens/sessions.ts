@@ -63,8 +63,15 @@ export const sessionsScreen: GlassScreen<AppSnapshot, AppActions> = {
       const sessions = snapshot.sessions.slice(0, MAX_SESSIONS)
       if (sessions[nav.highlightedIndex]) {
         ctx.openSession(sessions[nav.highlightedIndex])
-        // Explicitly switch to chat screen — don't rely on deriveScreen
-        return { ...nav, screen: 'chat', highlightedIndex: 0 }
+        // Explicitly switch to chat screen — don't rely on deriveScreen.
+        // Track origin (sessions list) and scroll position for GO_BACK.
+        return {
+          ...nav,
+          screen: 'chat',
+          highlightedIndex: 0,
+          previousScreen: 'sessions' as string,
+          previousHighlight: nav.highlightedIndex,
+        }
       }
       return nav
     }
