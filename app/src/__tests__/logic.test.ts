@@ -58,3 +58,95 @@ describe('Session display formatting', () => {
     expect(name).toBe('abc-123-')
   })
 })
+
+describe('G2 timestamp formatting (Bug #29)', () => {
+  // formatTimestamp logic replicated from sessions.ts for testability
+  function formatTimestamp(iso: string): string {
+    try {
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return iso.slice(0, 16).replace('T', ' ')
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      const hh = String(d.getHours()).padStart(2, '0')
+      const mi = String(d.getMinutes()).padStart(2, '0')
+      return `${mm}-${dd} ${hh}:${mi}`
+    } catch {
+      return iso.slice(0, 16).replace('T', ' ')
+    }
+  }
+
+  it('converts UTC ISO to local time format', () => {
+    // "2026-04-14T18:30:00.000Z" = April 14, 18:30 UTC
+    // In CET (UTC+1) this is 19:30, in CEST (UTC+2) this is 20:30
+    const result = formatTimestamp('2026-04-14T18:30:00.000Z')
+    // Result format: "MM-DD HH:MM" — exact hour depends on local TZ
+    expect(result).toMatch(/^\d{2}-\d{2} \d{2}:\d{2}$/)
+    // Verify date part is correct (April 14, or 15 in far-east TZ)
+    expect(result).toContain('04-14')
+  })
+
+  it('produces compact output (max 11 chars) for G2 display', () => {
+    const result = formatTimestamp('2026-04-14T18:30:00.000Z')
+    expect(result.length).toBeLessThanOrEqual(11)
+  })
+
+  it('handles malformed timestamps gracefully', () => {
+    const result = formatTimestamp('not-a-date')
+    expect(result).toBe('not-a-date')  // Falls back to truncated raw
+  })
+
+  it('handles empty string gracefully', () => {
+    const result = formatTimestamp('')
+    // new Date('') returns Invalid Date → NaN → falls back
+    expect(typeof result).toBe('string')
+  })
+})
+
+describe('Smartphone session time formatting (Issue #30)', () => {
+  function formatSessionTime(iso: string): string {
+    try {
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      const now = new Date()
+      const hh = String(d.getHours()).padStart(2, '0')
+      const mi = String(d.getMinutes()).padStart(2, '0')
+      const time = `${hh}:${mi}`
+      const isToday = d.toDateString() === now.toDateString()
+      if (isToday) return `Today ${time}`
+      const yesterday = new Date(now)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const isYesterday = d.toDateString() === yesterday.toDateString()
+      if (isYesterday) return `Yesterday ${time}`
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      return `${months[d.getMonth()]} ${d.getDate()}, ${time}`
+    } catch {
+      return ''
+    }
+  }
+
+  it('shows "Today" for timestamps on current date', () => {
+    const today = new Date()
+    const iso = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 14, 30).toISOString()
+    const result = formatSessionTime(iso)
+    expect(result).toMatch(/^Today \d{2}:\d{2}$/)
+  })
+
+  it('shows "Yesterday" for yesterday timestamps', () => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    yesterday.setHours(9, 15, 0, 0)
+    const result = formatSessionTime(yesterday.toISOString())
+    expect(result).toMatch(/^Yesterday \d{2}:\d{2}$/)
+  })
+
+  it('shows month/day for older timestamps', () => {
+    const old = new Date('2026-03-15T10:00:00.000Z')
+    const result = formatSessionTime(old.toISOString())
+    expect(result).toMatch(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d+, \d{2}:\d{2}$/)
+  })
+
+  it('returns empty string for malformed input', () => {
+    expect(formatSessionTime('garbage')).toBe('')
+  })
+})
