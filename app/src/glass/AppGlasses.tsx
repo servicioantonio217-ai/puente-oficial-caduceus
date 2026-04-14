@@ -55,12 +55,20 @@ export function AppGlasses() {
     return lines
   }, [messages, error, isLoading, isRecording])
 
+  // Track message count at last glass action for auto-scroll detection.
+  // When new messages arrive between actions (via polling), the chat
+  // display resets to the bottom so the latest content is always visible.
+  const lastActionLineCountRef = useRef(chatLines.length)
+  // Keep ref in sync with current line count (for snapshot construction)
+  lastActionLineCountRef.current = chatLines.length
+
   const snapshot: AppSnapshot = {
     screen: deriveScreenName(),
     connected,
     sessions: sortedSessions,
     currentSession,
     chatLines,
+    lastActionLineCount: lastActionLineCountRef.current,
     isRecording,
     isProcessing: isLoading,
     error,
@@ -97,21 +105,16 @@ export function AppGlasses() {
   const ctxRef = useRef(actions)
   ctxRef.current = actions
 
-  // Auto-scroll: wrap onGlassAction to reset scroll on new messages
-  const lastMsgCountRef = useRef(0)
-
+  // Auto-scroll tracking: after each glass action, sync the tracked count
+  // so the display function knows when new messages arrive between actions.
   const handleGlassAction = useCallback(
     (action: Parameters<typeof onGlassAction>[0], nav: Parameters<typeof onGlassAction>[1], snap: AppSnapshot) => {
       const result = onGlassAction(action, nav, snap, ctxRef.current)
 
-      // Auto-scroll to bottom when new messages arrived since last action
-      const msgCount = snap.chatLines.length
-      if (msgCount !== lastMsgCountRef.current) {
-        lastMsgCountRef.current = msgCount
-        if (result.screen === 'chat') {
-          return { ...result, highlightedIndex: 0 }
-        }
-      }
+      // Sync the tracked count after processing the action.
+      // The display function compares chatLines.length vs lastActionLineCount
+      // to decide whether to auto-scroll to bottom.
+      lastActionLineCountRef.current = snap.chatLines.length
 
       return result
     },

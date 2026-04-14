@@ -18,6 +18,10 @@ export interface AppSnapshot {
   sessions: Session[]
   currentSession: Session | null
   chatLines: ChatLine[]
+  /** Number of chat lines at the time of the last glass action.
+   *  Used for auto-scroll: if chatLines.length > lastActionLineCount,
+   *  the display resets to the bottom (scrollOffset = 0). */
+  lastActionLineCount: number
   isRecording: boolean
   isProcessing: boolean
   error: string | null

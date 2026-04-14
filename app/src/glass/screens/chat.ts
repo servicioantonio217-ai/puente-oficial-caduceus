@@ -1,6 +1,6 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { calcMaxScroll } from 'even-toolkit/glass-nav'
-import { buildChatDisplay } from 'even-toolkit/glass-chat-display'
+import { buildChatDisplay, formatChatLine } from 'even-toolkit/glass-chat-display'
 import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
 
@@ -19,6 +19,23 @@ import type { AppSnapshot, AppActions } from '../shared'
 
 /** Visible content lines (10 total - 2 header lines) */
 const CONTENT_SLOTS = 8
+
+/** Max chars per display line (G2 display constraint) */
+const MAX_CHARS = 44
+
+/**
+ * Calculate the actual number of display lines after word-wrapping.
+ * buildChatDisplay wraps long ChatLines, so the real line count
+ * may exceed chatLines.length. This function counts the wrapped lines
+ * so calcMaxScroll returns the correct maximum scroll offset.
+ */
+function countDisplayLines(chatLines: AppSnapshot['chatLines']): number {
+  let total = 0
+  for (const cl of chatLines) {
+    total += formatChatLine(cl, MAX_CHARS).length
+  }
+  return total
+}
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
@@ -42,13 +59,19 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
       ? snapshot.chatLines
       : [{ type: 'text' as const, text: '[ Tap to record ]' }]
 
+    // Auto-scroll: if new messages arrived since the last glass action,
+    // reset scrollOffset to 0 (bottom) so the latest content is visible.
+    // This handles the case where messages arrive via polling (not user action).
+    const hasNewMessages = msgCount > snapshot.lastActionLineCount
+    const scrollOffset = hasNewMessages ? 0 : nav.highlightedIndex
+
     // actionBar is required by buildChatDisplay but we don't want a visible bar.
     // Passing a single space renders as empty — satisfies the type without UI clutter.
     return buildChatDisplay({
       title,
       actionBar: ' ',
       chatLines: lines,
-      scrollOffset: nav.highlightedIndex,
+      scrollOffset,
       contentSlots: CONTENT_SLOTS,
     })
   },
@@ -68,7 +91,12 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     }
 
     if (action.type === 'HIGHLIGHT_MOVE') {
-      const maxScroll = calcMaxScroll(snapshot.chatLines.length, CONTENT_SLOTS)
+      // Use the ACTUAL display line count (after word-wrap), not chatLines.length.
+      // chatLines.length counts ChatLine objects, but buildChatDisplay wraps
+      // long lines, producing more display lines. Without this fix, calcMaxScroll
+      // returns 0 even when content overflows the display.
+      const totalDisplayLines = countDisplayLines(snapshot.chatLines)
+      const maxScroll = calcMaxScroll(totalDisplayLines, CONTENT_SLOTS)
       const delta = action.direction === 'up' ? 1 : -1
       const next = nav.highlightedIndex + delta
       return { ...nav, highlightedIndex: Math.max(0, Math.min(maxScroll, next)) }
