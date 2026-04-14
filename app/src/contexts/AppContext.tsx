@@ -26,6 +26,7 @@ function uuid(): string {
 import * as api from '../api'
 import { loadConfig, saveConfig } from '../storage'
 import { EvenAudioBridge } from '../audio'
+import { AudioRecorder } from '../audio/recorder'
 import { setupLifecycle } from '../lifecycle'
 
 interface AppContextValue {
@@ -265,9 +266,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /** Start voice recording via G2 glasses. */
   const startRecording = useCallback(() => {
     if (!currentSession || isRecording) return
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { AudioRecorder } = require('../audio/recorder')
     const recorder = new AudioRecorder()
 
     const bridge = new EvenAudioBridge({
