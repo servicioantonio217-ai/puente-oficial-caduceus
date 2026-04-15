@@ -154,11 +154,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const detail = await api.getSession(configRef.current, session.id)
       setCurrentSession(detail)
       setMessages(detail.messages ?? [])
-      // Touch updated_at so session bubbles to top in glasses list
-      const now = new Date().toISOString()
-      setSessions((prev) =>
-        prev.map((s) => s.id === session.id ? { ...s, updated_at: now } : s),
-      )
+      // Do NOT touch updated_at here — sessions should only reorder when
+      // actual content changes (message sent/received). The bridge handles
+      // this correctly via update_session_timestamp() in the message/audio routers.
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open session')
     } finally {

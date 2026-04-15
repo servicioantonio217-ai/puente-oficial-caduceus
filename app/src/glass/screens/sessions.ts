@@ -9,6 +9,27 @@ import type { AppSnapshot, AppActions } from '../shared'
 const MAX_SESSIONS = 10
 
 /**
+ * Format an ISO timestamp to a compact local-time string for G2 display.
+ *
+ * Converts UTC ISO strings (e.g. "2026-04-14T20:30:00.000Z") to the
+ * user's local timezone and returns a compact "MM-DD HH:MM" format
+ * (e.g. "04-14 22:30" in CEST). Falls back to raw string on parse failure.
+ */
+function formatTimestamp(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso.slice(0, 16).replace('T', ' ')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    return `${mm}-${dd} ${hh}:${mi}`
+  } catch {
+    return iso.slice(0, 16).replace('T', ' ')
+  }
+}
+
+/**
  * Sessions screen — scrollable session list with back navigation.
  *
  * Follows even-toolkit per-screen architecture:
@@ -25,7 +46,7 @@ export const sessionsScreen: GlassScreen<AppSnapshot, AppActions> = {
     // Build session items: name + formatted timestamp
     const sessionItems = snapshot.sessions.slice(0, MAX_SESSIONS).map((s) => {
       const name = s.name ?? s.id.slice(0, 8)
-      const ts = s.updated_at.replace('T', ' ').slice(0, 16)
+      const ts = formatTimestamp(s.updated_at)
       return `${name}  ${ts}`
     })
 
@@ -65,8 +86,15 @@ export const sessionsScreen: GlassScreen<AppSnapshot, AppActions> = {
         // openSession() is async — catch to prevent unhandled rejection.
         // Screen switches immediately; session load completes in background.
         ctx.openSession(sessions[nav.highlightedIndex]).catch(() => {})
-        // Explicitly switch to chat screen — don't rely on deriveScreen
-        return { ...nav, screen: 'chat', highlightedIndex: 0 }
+        // Explicitly switch to chat screen — don't rely on deriveScreen.
+        // Track origin (sessions list) and scroll position for GO_BACK.
+        return {
+          ...nav,
+          screen: 'chat',
+          highlightedIndex: 0,
+          previousScreen: 'sessions' as string,
+          previousHighlight: nav.highlightedIndex,
+        }
       }
       return nav
     }

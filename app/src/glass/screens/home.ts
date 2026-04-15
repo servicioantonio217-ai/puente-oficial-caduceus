@@ -52,8 +52,15 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
         // newSession() is async — catch to prevent unhandled rejection.
         // Screen switches immediately; session creation completes in background.
         ctx.newSession().catch(() => {})
-        // Explicitly switch to chat screen — don't rely on deriveScreen
-        return { ...nav, screen: 'chat', highlightedIndex: 0 }
+        // Explicitly switch to chat screen — don't rely on deriveScreen.
+        // Track origin so GO_BACK returns to home.
+        return {
+          ...nav,
+          screen: 'chat',
+          highlightedIndex: 0,
+          previousScreen: 'home' as string,
+          previousHighlight: 0,
+        }
       } else if (idx === 1) {
         return { ...nav, screen: 'sessions', highlightedIndex: 0 }
       }

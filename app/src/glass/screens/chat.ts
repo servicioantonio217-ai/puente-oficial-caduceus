@@ -84,7 +84,18 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
 
     if (action.type === 'GO_BACK') {
       ctx.goBack()
-      return { ...nav, screen: 'home', highlightedIndex: 0 }
+      // Return to the screen the user came from (sessions or home).
+      // If no previousScreen tracked (e.g. via syncScreen), default to home.
+      // GlassNavState is extended with previousScreen/previousHighlight by
+      // home.ts and sessions.ts when transitioning to chat.
+      const extras = nav as unknown as Record<string, unknown>
+      const prevScreen = extras.previousScreen as string | undefined
+      const prevHighlight = extras.previousHighlight as number | undefined
+      return {
+        ...nav,
+        screen: prevScreen ?? 'home',
+        highlightedIndex: prevHighlight ?? 0,
+      }
     }
 
     if (action.type === 'SELECT_HIGHLIGHTED') {
