@@ -93,20 +93,18 @@ export class EvenAudioBridge {
       console.warn('[EvenAudio] audioControl(true) failed:', err)
     }
 
-    // Capture `this` for the event callback so auto-stop can close
-    // the mic and deliver the blob properly.
-    const self = this
-
-    // Listen for audio PCM events via the EvenHub event system
+    // Listen for audio PCM events via the EvenHub event system.
+    // Arrow functions capture `this` from the enclosing lexical scope
+    // (the EvenAudioBridge instance), so no aliasing is needed.
     this.bridge.onEvent((event: EvenHubEvent) => {
-      if (!self.isActive) return
+      if (!this.isActive) return
 
       const audioPcm = event?.audioEvent?.audioPcm
       if (!audioPcm || audioPcm.length === 0) return
 
       // Convert 16-bit PCM LE (Uint8Array) to Float32Array
       const float32 = pcm16ToFloat32(audioPcm)
-      self.options.recorder.feedPCMSamples(float32)
+      this.options.recorder.feedPCMSamples(float32)
     })
 
     // Start the recorder with callbacks.
@@ -129,10 +127,10 @@ export class EvenAudioBridge {
         // VAD triggered auto-stop — close mic and deliver blob.
         // Set isActive = false FIRST to prevent re-entrant onEvent calls
         // from feeding more samples into the (now stopped) recorder.
-        self.isActive = false
-        self.closeMic()
+        this.isActive = false
+        this.closeMic()
         console.log(`[EvenAudio] VAD auto-stop: ${blob.size} bytes`)
-        self.options.onRecordingComplete(blob)
+        this.options.onRecordingComplete(blob)
       },
     })
 
