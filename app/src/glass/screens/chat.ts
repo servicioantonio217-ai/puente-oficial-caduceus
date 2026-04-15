@@ -1,5 +1,4 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
-import { calcMaxScroll } from 'even-toolkit/glass-nav'
 import { buildChatDisplay, formatChatLine } from 'even-toolkit/glass-chat-display'
 import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
@@ -24,17 +23,60 @@ const CONTENT_SLOTS = 8
 const MAX_CHARS = 44
 
 /**
- * Calculate the actual number of display lines after word-wrapping.
- * buildChatDisplay wraps long ChatLines, so the real line count
- * may exceed chatLines.length. This function counts the wrapped lines
- * so calcMaxScroll returns the correct maximum scroll offset.
+ * Build scroll target offsets for message-based scrolling.
+ *
+ * Instead of scrolling line-by-line, each scroll action jumps to the
+ * start of the next/previous message. Long messages that exceed
+ * contentSlots lines get additional pagination targets so the user
+ * can page through them without gaps.
+ *
+ * Always includes offset 0 (bottom/latest content) so the user can
+ * scroll back to the end after scrolling up.
+ *
+ * Returns sorted scrollOffset values (ascending: 0 = bottom/latest).
+ * scrollOffset semantics from buildChatDisplay:
+ *   start = max(0, totalLines - contentSlots - scrollOffset)
+ *   So scrollOffset = totalLines - contentSlots - displayLineIndex
  */
-function countDisplayLines(chatLines: AppSnapshot['chatLines']): number {
-  let total = 0
+export function buildMessageScrollTargets(
+  chatLines: AppSnapshot['chatLines'],
+  contentSlots: number = CONTENT_SLOTS,
+  maxChars: number = MAX_CHARS,
+): number[] {
+  if (chatLines.length === 0) return []
+
+  const boundaries: Set<number> = new Set() // display line indices
+  let currentLine = 0
+
   for (const cl of chatLines) {
-    total += formatChatLine(cl, MAX_CHARS).length
+    const lineCount = formatChatLine(cl, maxChars).length
+    boundaries.add(currentLine) // message start
+
+    // Add pagination within long messages.
+    // Step by contentSlots from the message start so each target
+    // shifts the viewport by exactly one page — no gaps in coverage.
+    let pageLine = contentSlots
+    while (currentLine + pageLine < currentLine + lineCount) {
+      boundaries.add(currentLine + pageLine)
+      pageLine += contentSlots
+    }
+
+    currentLine += lineCount
   }
-  return total
+
+  const totalLines = currentLine
+  const maxOffset = Math.max(0, totalLines - contentSlots)
+
+  // Convert display line indices to scrollOffset values and filter valid range
+  const offsets = [...boundaries]
+    .map(b => totalLines - contentSlots - b)
+    .filter(offset => offset >= 0 && offset <= maxOffset)
+
+  // Always include offset 0 (bottom) so user can scroll back to end
+  offsets.push(0)
+
+  // Deduplicate and sort ascending (0 = bottom/latest content)
+  return [...new Set(offsets)].sort((a, b) => a - b)
 }
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
@@ -109,15 +151,23 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     }
 
     if (action.type === 'HIGHLIGHT_MOVE') {
-      // Use the ACTUAL display line count (after word-wrap), not chatLines.length.
-      // chatLines.length counts ChatLine objects, but buildChatDisplay wraps
-      // long lines, producing more display lines. Without this fix, calcMaxScroll
-      // returns 0 even when content overflows the display.
-      const totalDisplayLines = countDisplayLines(snapshot.chatLines)
-      const maxScroll = calcMaxScroll(totalDisplayLines, CONTENT_SLOTS)
-      const delta = action.direction === 'up' ? 1 : -1
-      const next = nav.highlightedIndex + delta
-      return { ...nav, highlightedIndex: Math.max(0, Math.min(maxScroll, next)) }
+      // Message-based scrolling: each swipe jumps to the next/previous
+      // message boundary instead of scrolling line-by-line. Long messages
+      // get paged through in CONTENT_SLOTS increments.
+      const targets = buildMessageScrollTargets(snapshot.chatLines)
+      if (targets.length === 0) return nav
+
+      const current = nav.highlightedIndex
+
+      if (action.direction === 'up') {
+        // Going to earlier content: find next target above current position
+        const next = targets.find(t => t > current)
+        return { ...nav, highlightedIndex: next ?? current }
+      } else {
+        // Going to later content: find next target below current position
+        const prev = [...targets].reverse().find(t => t < current)
+        return { ...nav, highlightedIndex: prev ?? current }
+      }
     }
 
     return nav
