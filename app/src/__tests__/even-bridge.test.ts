@@ -20,8 +20,7 @@ describe('EvenAudioBridge', () => {
   })
 
   describe('isAvailable', () => {
-    it('returns false when EvenAppBridge is not present', () => {
-      // window.EvenAppBridge is undefined by default in test env
+    it('returns false when __evenBridge is not present', () => {
       const bridge = new EvenAudioBridge({
         recorder,
         onRecordingComplete: onComplete,
@@ -30,12 +29,12 @@ describe('EvenAudioBridge', () => {
       expect(bridge.isAvailable()).toBe(false)
     })
 
-    it('returns true when EvenAppBridge is present', () => {
+    it('returns true when __evenBridge is present', () => {
       const mockBridge = {
-        audioControl: vi.fn(),
-        onAudioData: vi.fn(),
+        rawBridge: { audioControl: vi.fn() },
+        onEvent: vi.fn(),
       }
-      window.EvenAppBridge = mockBridge
+      ;(window as unknown as Record<string, unknown>).__evenBridge = mockBridge
 
       const bridge = new EvenAudioBridge({
         recorder,
@@ -44,12 +43,12 @@ describe('EvenAudioBridge', () => {
       })
       expect(bridge.isAvailable()).toBe(true)
 
-      delete (window as unknown as Record<string, unknown>).EvenAppBridge
+      delete (window as unknown as Record<string, unknown>).__evenBridge
     })
   })
 
   describe('start', () => {
-    it('does nothing and does not set active when EvenAppBridge is unavailable', () => {
+    it('does nothing and does not set active when __evenBridge is unavailable', () => {
       const bridge = new EvenAudioBridge({
         recorder,
         onRecordingComplete: onComplete,
@@ -62,15 +61,15 @@ describe('EvenAudioBridge', () => {
       expect(onCancelled).not.toHaveBeenCalled()
     })
 
-    it('sets active and registers audio callback when EvenAppBridge is available', () => {
-      const audioDataCallback: Array<(data: Float32Array) => void> = []
+    it('sets active and registers event callback when __evenBridge is available', () => {
+      const eventCallbacks: Array<(event: { audioEvent?: { audioPcm?: Uint8Array } }) => void> = []
       const mockBridge = {
-        audioControl: vi.fn(),
-        onAudioData: vi.fn((cb: (data: Float32Array) => void) => {
-          audioDataCallback.push(cb)
+        rawBridge: { audioControl: vi.fn() },
+        onEvent: vi.fn((cb: (event: { audioEvent?: { audioPcm?: Uint8Array } }) => void) => {
+          eventCallbacks.push(cb)
         }),
       }
-      window.EvenAppBridge = mockBridge
+      ;(window as unknown as Record<string, unknown>).__evenBridge = mockBridge
 
       const bridge = new EvenAudioBridge({
         recorder,
@@ -80,18 +79,18 @@ describe('EvenAudioBridge', () => {
 
       bridge.start()
       expect(bridge.active).toBe(true)
-      expect(mockBridge.audioControl).toHaveBeenCalledWith(true)
-      expect(mockBridge.onAudioData).toHaveBeenCalledTimes(1)
+      expect(mockBridge.rawBridge.audioControl).toHaveBeenCalledWith(true)
+      expect(mockBridge.onEvent).toHaveBeenCalledTimes(1)
 
-      delete (window as unknown as Record<string, unknown>).EvenAppBridge
+      delete (window as unknown as Record<string, unknown>).__evenBridge
     })
 
     it('ignores duplicate start calls', () => {
       const mockBridge = {
-        audioControl: vi.fn(),
-        onAudioData: vi.fn(),
+        rawBridge: { audioControl: vi.fn() },
+        onEvent: vi.fn(),
       }
-      window.EvenAppBridge = mockBridge
+      ;(window as unknown as Record<string, unknown>).__evenBridge = mockBridge
 
       const bridge = new EvenAudioBridge({
         recorder,
@@ -101,9 +100,9 @@ describe('EvenAudioBridge', () => {
 
       bridge.start()
       bridge.start() // second call should be ignored
-      expect(mockBridge.audioControl).toHaveBeenCalledTimes(1)
+      expect(mockBridge.rawBridge.audioControl).toHaveBeenCalledTimes(1)
 
-      delete (window as unknown as Record<string, unknown>).EvenAppBridge
+      delete (window as unknown as Record<string, unknown>).__evenBridge
     })
   })
 
@@ -123,10 +122,10 @@ describe('EvenAudioBridge', () => {
 
     it('calls onRecordingCancelled when no samples were recorded', () => {
       const mockBridge = {
-        audioControl: vi.fn(),
-        onAudioData: vi.fn(),
+        rawBridge: { audioControl: vi.fn() },
+        onEvent: vi.fn(),
       }
-      window.EvenAppBridge = mockBridge
+      ;(window as unknown as Record<string, unknown>).__evenBridge = mockBridge
 
       const bridge = new EvenAudioBridge({
         recorder,
@@ -138,23 +137,23 @@ describe('EvenAudioBridge', () => {
       bridge.stop()
 
       expect(bridge.active).toBe(false)
-      expect(mockBridge.audioControl).toHaveBeenCalledWith(false)
+      expect(mockBridge.rawBridge.audioControl).toHaveBeenCalledWith(false)
       // No samples fed → recorder.stop() returns null → onCancelled
       expect(onCancelled).toHaveBeenCalledTimes(1)
       expect(onComplete).not.toHaveBeenCalled()
 
-      delete (window as unknown as Record<string, unknown>).EvenAppBridge
+      delete (window as unknown as Record<string, unknown>).__evenBridge
     })
 
     it('calls onRecordingComplete when samples were recorded', () => {
-      const audioDataCallback: Array<(data: Float32Array) => void> = []
+      const eventCallbacks: Array<(event: { audioEvent?: { audioPcm?: Uint8Array } }) => void> = []
       const mockBridge = {
-        audioControl: vi.fn(),
-        onAudioData: vi.fn((cb: (data: Float32Array) => void) => {
-          audioDataCallback.push(cb)
+        rawBridge: { audioControl: vi.fn() },
+        onEvent: vi.fn((cb: (event: { audioEvent?: { audioPcm?: Uint8Array } }) => void) => {
+          eventCallbacks.push(cb)
         }),
       }
-      window.EvenAppBridge = mockBridge
+      ;(window as unknown as Record<string, unknown>).__evenBridge = mockBridge
 
       const bridge = new EvenAudioBridge({
         recorder,
@@ -164,14 +163,15 @@ describe('EvenAudioBridge', () => {
 
       bridge.start()
 
-      // Feed audio data through the callback
-      const samples = new Float32Array([0.5, -0.3, 0.1])
-      audioDataCallback[0](samples)
+      // Feed audio data through the event callback
+      // 3 samples = 6 bytes of 16-bit PCM LE
+      const pcmBytes = new Uint8Array([0x00, 0x40, 0xCD, 0xFF, 0x0D, 0x33])
+      eventCallbacks[0]({ audioEvent: { audioPcm: pcmBytes } })
 
       bridge.stop()
 
       expect(bridge.active).toBe(false)
-      expect(mockBridge.audioControl).toHaveBeenCalledWith(false)
+      expect(mockBridge.rawBridge.audioControl).toHaveBeenCalledWith(false)
       expect(onComplete).toHaveBeenCalledTimes(1)
       expect(onCancelled).not.toHaveBeenCalled()
 
@@ -181,17 +181,17 @@ describe('EvenAudioBridge', () => {
       expect(blob.type).toBe('audio/wav')
       expect(blob.size).toBe(44 + 3 * 2) // 44 header + 3 samples * 2 bytes
 
-      delete (window as unknown as Record<string, unknown>).EvenAppBridge
+      delete (window as unknown as Record<string, unknown>).__evenBridge
     })
   })
 
   describe('cancel', () => {
     it('cancels active recording and fires onCancelled', () => {
       const mockBridge = {
-        audioControl: vi.fn(),
-        onAudioData: vi.fn(),
+        rawBridge: { audioControl: vi.fn() },
+        onEvent: vi.fn(),
       }
-      window.EvenAppBridge = mockBridge
+      ;(window as unknown as Record<string, unknown>).__evenBridge = mockBridge
 
       const bridge = new EvenAudioBridge({
         recorder,
@@ -203,11 +203,11 @@ describe('EvenAudioBridge', () => {
       bridge.cancel()
 
       expect(bridge.active).toBe(false)
-      expect(mockBridge.audioControl).toHaveBeenCalledWith(false)
+      expect(mockBridge.rawBridge.audioControl).toHaveBeenCalledWith(false)
       expect(onCancelled).toHaveBeenCalledTimes(1)
       expect(onComplete).not.toHaveBeenCalled()
 
-      delete (window as unknown as Record<string, unknown>).EvenAppBridge
+      delete (window as unknown as Record<string, unknown>).__evenBridge
     })
 
     it('does nothing when not active', () => {
