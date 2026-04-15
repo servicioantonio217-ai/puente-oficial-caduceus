@@ -106,6 +106,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const configRef = useRef(config)
   configRef.current = config
 
+  // Keep a ref to currentSession so async callbacks (onRecordingComplete)
+  // always access the latest session, even if the closure is stale.
+  // This prevents sending audio to the wrong session after a session change.
+  const currentSessionRef = useRef(currentSession)
+  currentSessionRef.current = currentSession
+
   const audioBridgeRef = useRef<EvenAudioBridge | null>(null)
 
   const setConfig = useCallback((c: BridgeConfig) => {
@@ -263,17 +269,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /** Start voice recording via G2 glasses. */
   const startRecording = useCallback(() => {
-    if (!currentSession || isRecording) return
+    // Guard: need an active session, must not already be recording,
+    // and must not be processing a previous recording's response.
+    // Without the isLoading check, a second tap during audio processing
+    // (sendAudio) would create a new bridge while the old one's callback
+    // is still in-flight, leaving the UI in an inconsistent state.
+    if (!currentSession || isRecording || isLoading) return
     const recorder = new AudioRecorder()
 
     const bridge = new EvenAudioBridge({
       recorder,
       onRecordingComplete: async (blob: Blob) => {
         setIsRecording(false)
+        setIsLoading(true)
         setError(null)
 
         try {
-          const result = await api.sendAudio(configRef.current, currentSession.id, blob)
+          // Use currentSessionRef to get the latest session, not the
+          // stale closure value. This handles the edge case where the
+          // session changes between start and completion.
+          const session = currentSessionRef.current
+          if (!session) {
+            console.warn('[Caduceus] Session lost during recording — discarding audio')
+            return
+          }
+
+          const result = await api.sendAudio(configRef.current, session.id, blob)
 
           // Add transcript as user message
           const userMsg: ChatMessage = {
@@ -302,6 +323,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           refreshSessions()
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Failed to process audio')
+        } finally {
+          setIsLoading(false)
         }
       },
       onRecordingCancelled: () => {
@@ -320,23 +343,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     audioBridgeRef.current = bridge
     setIsRecording(true)
     bridge.start()
-  }, [currentSession, isRecording, refreshSessions])
+  }, [currentSession, isRecording, isLoading, refreshSessions])
 
   /** Stop voice recording. */
   const stopRecording = useCallback(() => {
     const bridge = audioBridgeRef.current
     audioBridgeRef.current = null
 
-    if (!bridge) return
+    if (!bridge) {
+      // No bridge — just reset state if still recording (handles edge case
+      // where VAD auto-stop already cleaned up the bridge ref but isRecording
+      // hasn't been cleared yet due to React batching).
+      setIsRecording(false)
+      return
+    }
 
     if (bridge.active) {
       // Bridge was actively recording — stop() fires onRecordingComplete
       // or onRecordingCancelled, which calls setIsRecording(false).
       bridge.stop()
     } else {
-      // Bridge exists but never started (e.g., start() failed silently).
-      // No callback will fire, so reset the recording state directly to
-      // prevent the UI from getting stuck in "Recording" state.
+      // Bridge exists but already stopped (e.g., VAD auto-stop already fired
+      // onRecordingComplete, or start() failed silently). Reset the recording
+      // state directly to prevent the UI from getting stuck.
       setIsRecording(false)
     }
   }, [])
