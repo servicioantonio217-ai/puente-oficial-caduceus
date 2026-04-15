@@ -30,8 +30,8 @@ export interface AppSnapshot {
 export interface AppActions {
   navigate: (screen: ScreenName) => void
   goBack: () => void
-  openSession: (session: Session) => void
-  newSession: () => void
+  openSession: (session: Session) => Promise<void>
+  newSession: () => Promise<void>
   sendMessage: (text: string) => void
   toggleRecording: () => void
 }

@@ -49,7 +49,9 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
     if (action.type === 'SELECT_HIGHLIGHTED') {
       const idx = nav.highlightedIndex
       if (idx === 0) {
-        ctx.newSession()
+        // newSession() is async — catch to prevent unhandled rejection.
+        // Screen switches immediately; session creation completes in background.
+        ctx.newSession().catch(() => {})
         // Explicitly switch to chat screen — don't rely on deriveScreen.
         // Track origin so GO_BACK returns to home.
         return {

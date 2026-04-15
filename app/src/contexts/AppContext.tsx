@@ -26,6 +26,7 @@ function uuid(): string {
 import * as api from '../api'
 import { loadConfig, saveConfig } from '../storage'
 import { EvenAudioBridge } from '../audio'
+import { AudioRecorder } from '../audio/recorder'
 import { setupLifecycle } from '../lifecycle'
 
 interface AppContextValue {
@@ -263,9 +264,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /** Start voice recording via G2 glasses. */
   const startRecording = useCallback(() => {
     if (!currentSession || isRecording) return
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { AudioRecorder } = require('../audio/recorder')
     const recorder = new AudioRecorder()
 
     const bridge = new EvenAudioBridge({
@@ -311,6 +309,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
     })
 
+    // Verify EvenAppBridge is available BEFORE entering recording state.
+    // Without this check, setIsRecording(true) would leave the UI stuck in
+    // "Recording" if the bridge is unavailable (e.g., browser/simulator).
+    if (!bridge.isAvailable()) {
+      console.warn('[Caduceus] Cannot start recording: EvenAppBridge not available')
+      return
+    }
+
     audioBridgeRef.current = bridge
     setIsRecording(true)
     bridge.start()
@@ -318,8 +324,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /** Stop voice recording. */
   const stopRecording = useCallback(() => {
-    audioBridgeRef.current?.stop()
+    const bridge = audioBridgeRef.current
     audioBridgeRef.current = null
+
+    if (!bridge) return
+
+    if (bridge.active) {
+      // Bridge was actively recording — stop() fires onRecordingComplete
+      // or onRecordingCancelled, which calls setIsRecording(false).
+      bridge.stop()
+    } else {
+      // Bridge exists but never started (e.g., start() failed silently).
+      // No callback will fire, so reset the recording state directly to
+      // prevent the UI from getting stuck in "Recording" state.
+      setIsRecording(false)
+    }
   }, [])
 
   // Auto-dismiss errors after 8 seconds

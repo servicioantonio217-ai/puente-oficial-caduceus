@@ -77,6 +77,11 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   },
 
   action(action, nav, snapshot, ctx) {
+    // Debug: log all incoming action types to diagnose ring/touchpad issues (#18)
+    if (action.type !== 'HIGHLIGHT_MOVE') {
+      console.log(`[Chat] action: ${action.type}`, action)
+    }
+
     if (action.type === 'GO_BACK') {
       ctx.goBack()
       // Return to the screen the user came from (sessions or home).
@@ -97,6 +102,8 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
       // Only allow recording toggle when connected and not processing
       if (snapshot.connected && !snapshot.isProcessing) {
         ctx.toggleRecording()
+      } else {
+        console.log(`[Chat] SELECT_HIGHLIGHTED ignored — connected=${snapshot.connected}, isProcessing=${snapshot.isProcessing}`)
       }
       return nav
     }
