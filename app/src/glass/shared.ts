@@ -34,4 +34,5 @@ export interface AppActions {
   newSession: () => Promise<void>
   sendMessage: (text: string) => void
   toggleRecording: () => void
+  cancelRecording: () => void
 }

@@ -127,6 +127,11 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     }
 
     if (action.type === 'GO_BACK') {
+      // Cancel any active recording before navigating away.
+      // This stops the mic and discards partial audio — no send to bridge.
+      if (snapshot.isRecording) {
+        ctx.cancelRecording()
+      }
       ctx.goBack()
       // Return to the screen the user came from (sessions or home).
       // If no previousScreen tracked (e.g. via syncScreen), default to home.

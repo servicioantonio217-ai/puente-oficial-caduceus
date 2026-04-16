@@ -50,6 +50,7 @@ interface AppContextValue {
   sendText: (content: string) => Promise<void>
   startRecording: () => void
   stopRecording: () => void
+  cancelRecording: () => void
   logEntries: LogEntry[]
   clearLogs: () => void
 }
@@ -370,6 +371,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /** Cancel voice recording — stop mic and discard audio (no send to bridge). */
+  const cancelRecording = useCallback(() => {
+    const bridge = audioBridgeRef.current
+    audioBridgeRef.current = null
+
+    if (!bridge) {
+      // No bridge — just reset state if still recording
+      setIsRecording(false)
+      return
+    }
+
+    if (bridge.active) {
+      // cancel() fires onRecordingCancelled which calls setIsRecording(false).
+      // The audio is discarded — no onRecordingComplete fires.
+      bridge.cancel()
+    } else {
+      setIsRecording(false)
+    }
+  }, [])
+
   // Auto-dismiss errors after 8 seconds
   useEffect(() => {
     if (!error) return
@@ -413,7 +434,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         connect, disconnect,
         refreshSessions, openSession, closeSession,
         newSession, removeSession, renameSession,
-        sendText, startRecording, stopRecording,
+        sendText, startRecording, stopRecording, cancelRecording,
         logEntries, clearLogs,
       }}
     >
