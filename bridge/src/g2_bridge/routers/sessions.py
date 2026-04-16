@@ -142,8 +142,7 @@ async def rename_session(
     verify_client_token(credentials, settings)
 
     db: Database = request.app.state.db
-    now = _now_iso()
-    renamed = await db.rename_session(session_id, body.name, now)
+    renamed = await db.rename_session(session_id, body.name)
     if not renamed:
         raise AuthError(status_code=404, detail="Session not found")
 

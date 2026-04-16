@@ -135,11 +135,18 @@ class Database:
             )
             raise
 
-    async def rename_session(self, session_id: str, name: str, now: str) -> bool:
+    async def rename_session(self, session_id: str, name: str) -> bool:
+        """Rename a session without touching updated_at.
+
+        updated_at tracks content activity (messages), not metadata changes.
+        Bumping it on rename caused sessions to jump to the top of the list
+        on glasses (which sort by updated_at), creating an inconsistency with
+        the smartphone app. See issue #45.
+        """
         try:
             cursor = await self.connection.execute(
-                "UPDATE sessions SET name = ?, updated_at = ? WHERE id = ?",
-                (name, now, session_id),
+                "UPDATE sessions SET name = ? WHERE id = ?",
+                (name, session_id),
             )
             await self.connection.commit()
             return cursor.rowcount > 0
