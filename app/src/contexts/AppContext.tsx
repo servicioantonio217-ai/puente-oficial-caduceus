@@ -280,6 +280,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const bridge = new EvenAudioBridge({
       recorder,
       onRecordingComplete: async (blob: Blob) => {
+        // Transition: Recording → Thinking (no idle gap)
+        // isLoading maps to isProcessing in the G2 glasses snapshot,
+        // which shows "Thinking" in the header. This eliminates the
+        // confusing idle gap between recording stop and result display.
         setIsRecording(false)
         setIsLoading(true)
         setError(null)
@@ -296,7 +300,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           const result = await api.sendAudio(configRef.current, session.id, blob)
 
-          // Add transcript as user message
+          // Phase 1: Show transcript (user message) immediately so the user
+          // can verify what was transcribed while the response renders.
           const userMsg: ChatMessage = {
             id: uuid(),
             role: 'user',
@@ -305,7 +310,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           setMessages((prev) => [...prev, userMsg])
 
-          // Extract assistant response text with fallbacks
+          // Brief pause to force two separate renders — transcript first,
+          // then response. Without this, React batches both setMessages
+          // calls and the user sees Q&A appear simultaneously (#34).
+          await new Promise(resolve => setTimeout(resolve, 150))
+
+          // Phase 2: Show assistant response
           const assistantText = extractAssistantText(result.response)
 
           if (!assistantText) {
