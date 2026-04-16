@@ -58,10 +58,13 @@ See [app/README.md](app/README.md) for build and simulator instructions.
 g2-caduceus/
 ├── bridge/                    # Python/FastAPI bridge server
 ├── app/                       # TypeScript Even Hub app
-├── ARCHITECTURE.md            # Detailed architecture docs
-├── ROADMAP.md                 # Development roadmap
-├── E2E_TEST_PLAN.md           # End-to-end testing guide
-└── QR_SIDELOAD_WORKFLOW.md    # QR sideload dev workflow (glasses testing)
+└── docs/                       # Documentation
+    ├── ARCHITECTURE.md         # Detailed architecture docs
+    ├── CONTRIBUTING.md         # Dev setup, code style, PR process
+    ├── E2E_TEST_PLAN.md        # End-to-end testing guide
+    ├── PHASE5_TODO.md          # Phase 5 bug tracker
+    ├── QR_SIDELOAD_WORKFLOW.md # QR sideload dev workflow (glasses testing)
+    └── ROADMAP.md              # Development roadmap
 ```
 
 ## Development
