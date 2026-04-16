@@ -24,7 +24,11 @@ function uuid(): string {
 }
 
 import * as api from '../api'
-import { loadConfig, saveConfig, loadRecordingSettings, saveRecordingSettings } from '../storage'
+import {
+  loadConfig, saveConfigToBridge,
+  loadRecordingSettings, saveRecordingSettingsToBridge,
+  loadConfigFromBridge, loadRecordingSettingsFromBridge,
+} from '../storage'
 import { EvenAudioBridge } from '../audio'
 import { AudioRecorder } from '../audio/recorder'
 import { setupLifecycle } from '../lifecycle'
@@ -126,12 +130,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setConfig = useCallback((c: BridgeConfig) => {
     setConfigState(c)
-    saveConfig(c)
+    saveConfigToBridge(c)
   }, [])
 
   const setRecordingSettings = useCallback((s: RecordingSettings) => {
     setRecordingSettingsState(s)
-    saveRecordingSettings(s)
+    saveRecordingSettingsToBridge(s)
   }, [])
 
   /** Check bridge health and fetch sessions. */
@@ -461,6 +465,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       connect()
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // On mount, try to load config from Even Hub bridge storage.
+  // The bridge persists data across WebView reloads / app restarts,
+  // unlike browser localStorage which gets cleared.
+  // If bridge has config different from localStorage, update state.
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([loadConfigFromBridge(), loadRecordingSettingsFromBridge()]).then(
+      ([bridgeConfig, bridgeSettings]) => {
+        if (cancelled) return
+        // Only update if bridge returned actual values (not empty defaults)
+        if (bridgeConfig.url && bridgeConfig.token) {
+          setConfigState(bridgeConfig)
+        }
+        setRecordingSettingsState(bridgeSettings)
+      },
+    ).catch(() => { /* bridge unavailable — localStorage values already in use */ })
+    return () => { cancelled = true }
+  }, [])
 
   // Foreground/background lifecycle: keep-alive, cleanup recording, reconnect
   useEffect(() => {
