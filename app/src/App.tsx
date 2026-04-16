@@ -45,7 +45,6 @@ function ChatLayout() {
       }
     >
       <ChatScreen />
-      <AppGlasses />
     </AppShell>
   )
 }
@@ -67,7 +66,6 @@ function SessionsLayout() {
       }
     >
       <SessionsScreen />
-      <AppGlasses />
     </AppShell>
   )
 }
@@ -100,6 +98,14 @@ function LogsLayout() {
 export function App() {
   return (
     <AppProvider>
+      {/*
+        AppGlasses is placed OUTSIDE the Routes so it persists across
+        navigation. Previously it was inside ChatLayout and SessionsLayout,
+        causing the glasses bridge to be destroyed and recreated on every
+        route change — this broke glasses control when the phone app
+        navigated between sessions (see issue #40).
+      */}
+      <AppGlasses />
       <Routes>
         <Route path="/" element={<ChatLayout />} />
         <Route path="/sessions" element={<SessionsLayout />} />
