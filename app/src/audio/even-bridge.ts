@@ -93,7 +93,9 @@ export class EvenAudioBridge {
       console.warn('[EvenAudio] audioControl(true) failed:', err)
     }
 
-    // Listen for audio PCM events via the EvenHub event system
+    // Listen for audio PCM events via the EvenHub event system.
+    // Arrow functions capture `this` from the enclosing lexical scope
+    // (the EvenAudioBridge instance), so no aliasing is needed.
     this.bridge.onEvent((event: EvenHubEvent) => {
       if (!this.isActive) return
 
@@ -105,7 +107,12 @@ export class EvenAudioBridge {
       this.options.recorder.feedPCMSamples(float32)
     })
 
-    // Start the recorder with callbacks
+    // Start the recorder with callbacks.
+    // The onAutoStop callback handles VAD-triggered auto-stop:
+    // when silence is detected, the recorder auto-stops and delivers
+    // the blob here so we can close the mic and forward it to
+    // onRecordingComplete. Without this, the blob was lost and
+    // subsequent recordings would fail (root cause of issue #35).
     this.options.recorder.start({
       onAudioLevel: () => {
         // Could update a VU meter in the UI
@@ -116,28 +123,39 @@ export class EvenAudioBridge {
       onSilenceEnd: () => {
         // Speech detected again
       },
+      onAutoStop: (blob: Blob) => {
+        // VAD triggered auto-stop — close mic and deliver blob.
+        // Set isActive = false FIRST to prevent re-entrant onEvent calls
+        // from feeding more samples into the (now stopped) recorder.
+        this.isActive = false
+        this.closeMic()
+        console.log(`[EvenAudio] VAD auto-stop: ${blob.size} bytes`)
+        this.options.onRecordingComplete(blob)
+      },
     })
 
     console.log('[EvenAudio] Recording started via G2 glasses')
+  }
+
+  /** Close the glasses microphone. */
+  private closeMic(): void {
+    if (!this.bridge) return
+    try {
+      if (this.bridge.rawBridge?.audioControl) {
+        this.bridge.rawBridge.audioControl(false)
+      } else if (this.bridge.rawBridge?.callEvenApp) {
+        this.bridge.rawBridge.callEvenApp('audioControl', { isOpen: false })
+      }
+    } catch (err) {
+      console.warn('[EvenAudio] audioControl(false) failed:', err)
+    }
   }
 
   /** Stop voice recording and return the WAV blob. */
   stop(): void {
     if (!this.isActive) return
 
-    // Close the glasses microphone
-    if (this.bridge) {
-      try {
-        if (this.bridge.rawBridge?.audioControl) {
-          this.bridge.rawBridge.audioControl(false)
-        } else if (this.bridge.rawBridge?.callEvenApp) {
-          this.bridge.rawBridge.callEvenApp('audioControl', { isOpen: false })
-        }
-      } catch (err) {
-        console.warn('[EvenAudio] audioControl(false) failed:', err)
-      }
-    }
-
+    this.closeMic()
     const blob = this.options.recorder.stop()
     this.isActive = false
 
@@ -154,18 +172,7 @@ export class EvenAudioBridge {
   cancel(): void {
     if (!this.isActive) return
 
-    if (this.bridge) {
-      try {
-        if (this.bridge.rawBridge?.audioControl) {
-          this.bridge.rawBridge.audioControl(false)
-        } else if (this.bridge.rawBridge?.callEvenApp) {
-          this.bridge.rawBridge.callEvenApp('audioControl', { isOpen: false })
-        }
-      } catch (err) {
-        console.warn('[EvenAudio] audioControl(false) failed:', err)
-      }
-    }
-
+    this.closeMic()
     this.options.recorder.cancel()
     this.isActive = false
     this.options.onRecordingCancelled()

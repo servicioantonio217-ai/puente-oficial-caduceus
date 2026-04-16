@@ -9,6 +9,8 @@ export interface RecorderCallbacks {
   onAudioLevel: (level: number) => void
   onSilenceStart: () => void
   onSilenceEnd: () => void
+  /** Called when VAD auto-stop triggers. The recorder has already stopped. */
+  onAutoStop?: (blob: Blob) => void
 }
 
 export interface AudioRecorderOptions {
@@ -151,7 +153,13 @@ export class AudioRecorder {
       if (silenceDuration >= this.options.silenceTimeoutMs) {
         const recordingDuration = Date.now() - this.startTime
         if (recordingDuration >= this.options.minDurationMs) {
-          this.stop()
+          // VAD auto-stop: produce the blob and notify via callback
+          // instead of discarding it (this was the root cause of
+          // "recording only works once" — the blob was lost on auto-stop).
+          const blob = this.stop()
+          if (blob && this.callbacks?.onAutoStop) {
+            this.callbacks.onAutoStop(blob)
+          }
         }
       }
     } else {
