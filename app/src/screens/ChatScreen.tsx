@@ -1,11 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChatContainer, ChatInput } from 'even-toolkit/web'
 import type { ChatMessage } from 'even-toolkit/web'
 import { useApp } from '../contexts/AppContext'
 
 export function ChatScreen() {
-  const { currentSession, messages, isLoading, error, sendText, newSession } = useApp()
+  const { currentSession, messages, isLoading, isRecording, error, sendText, newSession, cancelRecording } = useApp()
   const [inputValue, setInputValue] = useState('')
+
+  // Cancel any active recording when leaving the chat screen (unmount).
+  // This stops the mic and discards partial audio — no send to bridge.
+  useEffect(() => {
+    return () => {
+      if (isRecording) {
+        cancelRecording()
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSend = () => {
     const trimmed = inputValue.trim()

@@ -20,6 +20,7 @@ export function AppGlasses() {
     connected, sessions, currentSession, messages,
     isLoading, isRecording, error,
     newSession, openSession, closeSession, sendText, startRecording, stopRecording,
+    cancelRecording,
   } = useApp()
 
   // Screen routing: chat when session open, home otherwise
@@ -86,9 +87,14 @@ export function AppGlasses() {
   }, [])
 
   const goBack = useCallback(() => {
+    // Cancel any active recording before leaving the chat screen.
+    // This stops the mic and discards partial audio (no send to bridge).
+    if (isRecording) {
+      cancelRecording()
+    }
     // Returning from chat clears the current session context
     closeSession()
-  }, [closeSession])
+  }, [closeSession, isRecording, cancelRecording])
 
   const actions: AppActions = {
     navigate,
@@ -100,6 +106,7 @@ export function AppGlasses() {
       if (isRecording) stopRecording()
       else startRecording()
     },
+    cancelRecording,
   }
 
   const ctxRef = useRef(actions)
