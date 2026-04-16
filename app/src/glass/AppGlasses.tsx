@@ -38,12 +38,13 @@ export function AppGlasses() {
 
   // Build chat lines — pure content only, no status indicators.
   // Status (recording/processing) lives in the header & action bar, not in chat content.
-  // Assistant messages get 2-space indent for visual grouping; user messages keep > prefix.
+  // Prefix convention: > = user message (prompt), >> = assistant message (tool).
+  // This creates a symmetric visual pattern on the G2 display for easy distinction.
   const chatLines = useMemo(() => {
-    const lines: Array<{ type: 'prompt' | 'text' | 'system' | 'error'; text: string }> = messages.map((msg) => {
+    const lines: Array<{ type: 'prompt' | 'tool' | 'system' | 'error'; text: string }> = messages.map((msg) => {
       if (msg.role === 'user') return { type: 'prompt' as const, text: msg.content }
-      // 2-space prefix creates visual indent for assistant messages
-      if (msg.role === 'assistant') return { type: 'text' as const, text: `  ${msg.content}` }
+      // 'tool' type renders with >> prefix in even-toolkit — visually distinct from > (user)
+      if (msg.role === 'assistant') return { type: 'tool' as const, text: msg.content }
       return { type: 'system' as const, text: msg.content }
     })
     // Show error as error line when idle (not recording, not processing)

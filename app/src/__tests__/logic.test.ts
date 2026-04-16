@@ -37,10 +37,10 @@ describe('ChatLine type mapping', () => {
     expect(chatLine.text).toBe('Hello')
   })
 
-  it('maps assistant messages to text type', () => {
+  it('maps assistant messages to tool type (>> prefix)', () => {
     const msg = { id: '2', role: 'assistant' as const, content: 'Hi!', created_at: '2026-01-01' }
-    const chatLine = { type: 'text' as const, text: msg.content }
-    expect(chatLine.type).toBe('text')
+    const chatLine = { type: 'tool' as const, text: msg.content }
+    expect(chatLine.type).toBe('tool')
     expect(chatLine.text).toBe('Hi!')
   })
 })
