@@ -1,6 +1,7 @@
 import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { buildScrollableList } from 'even-toolkit/glass-display-builders'
 import { moveHighlight } from 'even-toolkit/glass-nav'
+import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
 
 /** Menu items for the home screen */
@@ -12,19 +13,20 @@ const MENU_ITEMS = ['New Session', 'Sessions'] as const
  * Follows even-toolkit per-screen architecture:
  * - Uses buildScrollableList with ▲/▼ scroll indicators
  * - drillLabel (›) for navigable items
+ * - fieldJoin for header metadata
  * - No split layout — pure text mode
- * - No title line — the Even Hub wrapper already displays the app name
  *
  * Screen transitions are explicit: actions return the target screen
  * via nav.screen change (not via deriveScreen).
  */
 export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    // Connection status shown as a subtle meta line (wrapper already provides app name)
-    const statusText = snapshot.connected ? '  ● Connected' : '  ○ Disconnected'
+    const headerStatus = snapshot.connected ? 'Connected' : 'Disconnected'
+    const title = fieldJoin('Caduceus', headerStatus)
 
     const lines = [
-      { text: statusText, inverted: false, style: 'meta' as const },
+      { text: title, inverted: false, style: 'normal' as const },
+      { text: '', inverted: false, style: 'separator' as const },
       ...buildScrollableList({
         items: [...MENU_ITEMS],
         highlightedIndex: nav.highlightedIndex,
