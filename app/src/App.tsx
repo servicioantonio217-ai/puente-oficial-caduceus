@@ -22,8 +22,11 @@ function ChatLayout() {
   return (
     <AppShell
       header={
+        /* Title intentionally empty — app icon already identifies the app.
+           Keeping "" preserves NavHeader's centered-left-right layout.
+           See #49: previous !71 incorrectly modified glass/screens/home.ts */
         <NavHeader
-          title="Caduceus"
+          title=""
           left={
             currentSession ? (
               <Button variant="ghost" size="icon" onClick={handleBack}>
