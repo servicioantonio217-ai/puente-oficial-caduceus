@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { loadConfig, saveConfig, loadRecordingSettings, saveRecordingSettings, DEFAULT_RECORDING_SETTINGS } from '../storage'
+import {
+  loadConfig, saveConfigToBridge,
+  loadRecordingSettings, saveRecordingSettingsToBridge,
+  DEFAULT_RECORDING_SETTINGS,
+} from '../storage'
 import type { BridgeConfig, RecordingSettings } from '../types'
 
 const mockLocalStorage = (() => {
@@ -28,7 +32,7 @@ describe('storage — BridgeConfig', () => {
 
   it('returns saved config', () => {
     const config: BridgeConfig = { url: 'http://bridge:8643', token: 'secret' }
-    saveConfig(config)
+    saveConfigToBridge(config)
 
     const loaded = loadConfig()
     expect(loaded).toEqual(config)
@@ -50,7 +54,7 @@ describe('storage — RecordingSettings', () => {
 
   it('returns saved settings', () => {
     const settings: RecordingSettings = { autoStopEnabled: false, silenceTimeoutMs: 3000 }
-    saveRecordingSettings(settings)
+    saveRecordingSettingsToBridge(settings)
 
     const loaded = loadRecordingSettings()
     expect(loaded).toEqual(settings)
@@ -110,7 +114,7 @@ describe('storage — RecordingSettings', () => {
 
   it('persists settings to localStorage', () => {
     const settings: RecordingSettings = { autoStopEnabled: false, silenceTimeoutMs: 4000 }
-    saveRecordingSettings(settings)
+    saveRecordingSettingsToBridge(settings)
 
     expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
       'g2-caduceus-recording-settings',
@@ -120,10 +124,10 @@ describe('storage — RecordingSettings', () => {
 
   it('does not affect BridgeConfig storage', () => {
     const config: BridgeConfig = { url: 'http://x:8643', token: 'tok' }
-    saveConfig(config)
+    saveConfigToBridge(config)
 
     const settings: RecordingSettings = { autoStopEnabled: false, silenceTimeoutMs: 2000 }
-    saveRecordingSettings(settings)
+    saveRecordingSettingsToBridge(settings)
 
     // Both should load independently
     expect(loadConfig()).toEqual(config)

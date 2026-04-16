@@ -1,4 +1,5 @@
 import type { BridgeConfig, RecordingSettings } from './types'
+import { storageGet, storageSet } from 'even-toolkit/storage'
 
 const STORAGE_KEY = 'g2-caduceus-config'
 const RECORDING_SETTINGS_KEY = 'g2-caduceus-recording-settings'
@@ -9,9 +10,15 @@ export const DEFAULT_RECORDING_SETTINGS: RecordingSettings = {
   silenceTimeoutMs: 1500,
 }
 
+const DEFAULT_CONFIG: BridgeConfig = { url: '', token: '' }
+
 // ---------------------------------------------------------------------------
-// Sync localStorage (fallback for browser/dev, also used as immediate init)
+// Sync localStorage (for useState initializer — must be synchronous)
 // ---------------------------------------------------------------------------
+// even-toolkit's storageGet/set is async (uses the Even Hub bridge).
+// React's useState initializer must be synchronous, so we read from
+// browser localStorage as an immediate seed, then upgrade to bridge
+// storage values in a useEffect once the async bridge is ready.
 
 export function loadConfig(): BridgeConfig {
   try {
@@ -21,11 +28,13 @@ export function loadConfig(): BridgeConfig {
       if (parsed.url && parsed.token) return parsed
     }
   } catch { /* ignore */ }
-  return { url: '', token: '' }
+  return { ...DEFAULT_CONFIG }
 }
 
-export function saveConfig(config: BridgeConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+function saveConfigToLocal(config: BridgeConfig): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  } catch { /* ignore — localStorage may be unavailable */ }
 }
 
 export function loadRecordingSettings(): RecordingSettings {
@@ -44,100 +53,58 @@ export function loadRecordingSettings(): RecordingSettings {
   return { ...DEFAULT_RECORDING_SETTINGS }
 }
 
-export function saveRecordingSettings(settings: RecordingSettings): void {
-  localStorage.setItem(RECORDING_SETTINGS_KEY, JSON.stringify(settings))
-}
-
-// ---------------------------------------------------------------------------
-// Async Even Hub Bridge Storage (persists across app restarts in WebView)
-//
-// The Even Hub SDK provides setLocalStorage / getLocalStorage on the native
-// bridge object. These persist on the Flutter host side, surviving WebView
-// reloads and app restarts — unlike browser localStorage which gets cleared.
-//
-// All bridge writes are fire-and-forget (no await). If the bridge is
-// unavailable (browser/dev), calls silently fall back to localStorage only.
-// ---------------------------------------------------------------------------
-
-/** Shape of the Even Hub bridge we need. Keeps us decoupled from the full SDK type. */
-interface EvenHubBridge {
-  setLocalStorage(key: string, value: string): Promise<boolean>
-  getLocalStorage(key: string): Promise<string>
-}
-
-/**
- * Attempt to obtain the Even Hub bridge for persistent storage.
- * Returns null when running outside the Even Hub app (browser / simulator).
- */
-async function getBridge(): Promise<EvenHubBridge | null> {
+function saveRecordingSettingsToLocal(settings: RecordingSettings): void {
   try {
-    // Dynamic import so the SDK is only pulled in when actually available.
-    const mod = await import('@evenrealities/even_hub_sdk')
-    const bridge = await mod.waitForEvenAppBridge()
-    return bridge as unknown as EvenHubBridge
-  } catch {
-    return null
-  }
+    localStorage.setItem(RECORDING_SETTINGS_KEY, JSON.stringify(settings))
+  } catch { /* ignore — localStorage may be unavailable */ }
 }
 
-/**
- * Load config from Even Hub bridge storage (async).
- * Falls back to localStorage when the bridge is unavailable.
- */
+// ---------------------------------------------------------------------------
+// Async bridge storage via even-toolkit (persists across WebView reloads)
+// ---------------------------------------------------------------------------
+// even-toolkit/storage wraps the Even Hub SDK bridge with:
+//   - Automatic JSON.stringify / JSON.parse
+//   - Write chain to prevent read-after-write races
+//   - Graceful fallback when bridge is unavailable
+//
+// We keep sync localStorage writes alongside for immediate reads on mount.
+
 export async function loadConfigFromBridge(): Promise<BridgeConfig> {
-  const bridge = await getBridge()
-  if (bridge) {
-    try {
-      const raw = await bridge.getLocalStorage(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.url && parsed.token) {
-          // Cache in localStorage for instant sync reads on next mount.
-          saveConfig(parsed)
-          return parsed
-        }
-      }
-    } catch { /* ignore */ }
-  }
+  try {
+    const cfg = await storageGet<BridgeConfig>(STORAGE_KEY, DEFAULT_CONFIG)
+    if (cfg.url && cfg.token) {
+      // Cache in localStorage for instant sync reads on next mount.
+      saveConfigToLocal(cfg)
+      return cfg
+    }
+  } catch { /* bridge unavailable — localStorage values already in use */ }
   return loadConfig()
 }
 
 /**
  * Save config to both localStorage (sync) and Even Hub bridge (async).
- * The bridge write is fire-and-forget — errors are silently swallowed.
+ * Fire-and-forget — errors are silently swallowed by even-toolkit.
  */
 export function saveConfigToBridge(config: BridgeConfig): void {
-  saveConfig(config)
-  getBridge().then((bridge) => {
-    if (bridge) {
-      bridge.setLocalStorage(STORAGE_KEY, JSON.stringify(config))
-    }
-  }).catch(() => { /* ignore */ })
+  saveConfigToLocal(config)
+  storageSet(STORAGE_KEY, config) // fire-and-forget, errors swallowed internally
 }
 
-/**
- * Load recording settings from Even Hub bridge storage (async).
- * Falls back to localStorage when the bridge is unavailable.
- */
 export async function loadRecordingSettingsFromBridge(): Promise<RecordingSettings> {
-  const bridge = await getBridge()
-  if (bridge) {
-    try {
-      const raw = await bridge.getLocalStorage(RECORDING_SETTINGS_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (typeof parsed.autoStopEnabled === 'boolean' && typeof parsed.silenceTimeoutMs === 'number') {
-          const settings: RecordingSettings = {
-            autoStopEnabled: parsed.autoStopEnabled,
-            silenceTimeoutMs: Math.max(500, Math.min(5000, parsed.silenceTimeoutMs)),
-          }
-          // Cache in localStorage for instant sync reads on next mount.
-          saveRecordingSettings(settings)
-          return settings
-        }
+  try {
+    const raw = await storageGet<Partial<RecordingSettings>>(
+      RECORDING_SETTINGS_KEY,
+      DEFAULT_RECORDING_SETTINGS,
+    )
+    if (typeof raw.autoStopEnabled === 'boolean' && typeof raw.silenceTimeoutMs === 'number') {
+      const settings: RecordingSettings = {
+        autoStopEnabled: raw.autoStopEnabled,
+        silenceTimeoutMs: Math.max(500, Math.min(5000, raw.silenceTimeoutMs)),
       }
-    } catch { /* ignore */ }
-  }
+      saveRecordingSettingsToLocal(settings)
+      return settings
+    }
+  } catch { /* bridge unavailable */ }
   return loadRecordingSettings()
 }
 
@@ -145,10 +112,6 @@ export async function loadRecordingSettingsFromBridge(): Promise<RecordingSettin
  * Save recording settings to both localStorage (sync) and Even Hub bridge (async).
  */
 export function saveRecordingSettingsToBridge(settings: RecordingSettings): void {
-  saveRecordingSettings(settings)
-  getBridge().then((bridge) => {
-    if (bridge) {
-      bridge.setLocalStorage(RECORDING_SETTINGS_KEY, JSON.stringify(settings))
-    }
-  }).catch(() => { /* ignore */ })
+  saveRecordingSettingsToLocal(settings)
+  storageSet(RECORDING_SETTINGS_KEY, settings) // fire-and-forget
 }
