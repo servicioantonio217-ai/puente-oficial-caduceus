@@ -140,7 +140,8 @@ async def test_bulk_delete_sessions(client):
         ids.append(resp.json()["id"])
 
     response = await client.post(
-        "/v1/sessions/bulk-delete", headers=HEADERS,
+        "/v1/sessions/bulk-delete",
+        headers=HEADERS,
         json={"session_ids": ids[:2]},
     )
     assert response.status_code == 200
@@ -158,7 +159,8 @@ async def test_bulk_delete_sessions(client):
 async def test_bulk_delete_nonexistent_ids(client):
     """Bulk delete with non-existent IDs returns 0 deleted."""
     response = await client.post(
-        "/v1/sessions/bulk-delete", headers=HEADERS,
+        "/v1/sessions/bulk-delete",
+        headers=HEADERS,
         json={"session_ids": ["fake-id-1", "fake-id-2"]},
     )
     assert response.status_code == 200
@@ -168,7 +170,8 @@ async def test_bulk_delete_nonexistent_ids(client):
 async def test_bulk_delete_empty_list_rejected(client):
     """Bulk delete with empty session_ids list is rejected (min_length=1)."""
     response = await client.post(
-        "/v1/sessions/bulk-delete", headers=HEADERS,
+        "/v1/sessions/bulk-delete",
+        headers=HEADERS,
         json={"session_ids": []},
     )
     assert response.status_code == 422  # Validation error
