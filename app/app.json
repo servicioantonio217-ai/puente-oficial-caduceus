@@ -2,7 +2,7 @@
   "package_id": "com.g2caduceus.app",
   "edition": "202601",
   "name": "G2 Caduceus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "min_app_version": "2.0.0",
   "min_sdk_version": "0.0.7",
   "entrypoint": "index.html",
@@ -10,6 +10,10 @@
     {
       "name": "network",
       "desc": "Connects to the G2 Bridge server for AI chat sessions."
+    },
+    {
+      "name": "g2-microphone",
+      "desc": "Enables voice commands for hands-free control."
     }
   ],
   "supported_languages": [
