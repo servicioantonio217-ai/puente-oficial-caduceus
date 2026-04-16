@@ -165,6 +165,26 @@ class Database:
             logger.error("Failed to delete session %s", session_id, exc_info=True)
             raise
 
+    async def delete_sessions_bulk(self, session_ids: list[str]) -> int:
+        """Delete multiple sessions by ID. Returns count of deleted sessions.
+
+        Uses a single DELETE with IN clause for efficiency. Messages are
+        automatically removed via ON DELETE CASCADE foreign key.
+        """
+        if not session_ids:
+            return 0
+        try:
+            placeholders = ",".join("?" for _ in session_ids)
+            cursor = await self.connection.execute(
+                f"DELETE FROM sessions WHERE id IN ({placeholders})",
+                session_ids,
+            )
+            await self.connection.commit()
+            return cursor.rowcount
+        except Exception:
+            logger.error("Failed to bulk delete sessions", exc_info=True)
+            raise
+
     # --- Message operations ---
 
     async def add_message(

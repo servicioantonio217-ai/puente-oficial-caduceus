@@ -12,6 +12,7 @@ from g2_bridge.auth import AuthError, verify_client_token
 from g2_bridge.config import Settings
 from g2_bridge.database import Database
 from g2_bridge.models import (
+    BulkDeleteRequest,
     CreateSessionRequest,
     MessageResponse,
     RenameSessionRequest,
@@ -106,6 +107,27 @@ async def list_sessions(request: Request) -> list[SessionResponse]:
     rows = await db.list_sessions()
 
     return [_convert_session_row(settings, row) for row in rows]
+
+
+@router.post("/bulk-delete", status_code=200)
+async def bulk_delete_sessions(request: Request, body: BulkDeleteRequest) -> dict:
+    """Delete multiple sessions in a single request.
+
+    Accepts a list of session IDs and deletes them all atomically.
+    Returns the count of deleted sessions.
+    """
+    from fastapi.security import HTTPBearer
+
+    credentials = await HTTPBearer(auto_error=False)(request)
+    if credentials is None:
+        raise AuthError(status_code=401, detail="Missing bearer token")
+    settings = request.app.state.settings
+    verify_client_token(credentials, settings)
+
+    db: Database = request.app.state.db
+    deleted_count = await db.delete_sessions_bulk(body.session_ids)
+
+    return {"deleted_count": deleted_count}
 
 
 @router.get("/{session_id}", response_model=SessionDetailResponse)

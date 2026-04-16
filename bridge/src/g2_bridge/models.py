@@ -69,6 +69,12 @@ class RenameSessionRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
 
 
+class BulkDeleteRequest(BaseModel):
+    """Request body for bulk session deletion."""
+
+    session_ids: list[str] = Field(..., min_length=1, max_length=100)
+
+
 class SessionResponse(BaseModel):
     id: str
     name: str
