@@ -221,9 +221,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const renameSession = useCallback(async (id: string, name: string) => {
     try {
       const updated = await api.renameSession(configRef.current, id, name)
-      setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)))
+      // Preserve the original updated_at from state, not the API response.
+      // The backend no longer bumps updated_at on rename (issue #45),
+      // but this guard ensures session order stays stable even if the
+      // backend response somehow has a different timestamp.
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id !== id) return s
+          return { ...updated, updated_at: s.updated_at }
+        }),
+      )
       if (currentSession?.id === id) {
-        setCurrentSession(updated)
+        setCurrentSession((prev) => prev ? { ...updated, updated_at: prev.updated_at } : updated)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to rename session')
