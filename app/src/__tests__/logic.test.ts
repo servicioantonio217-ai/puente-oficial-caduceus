@@ -150,3 +150,69 @@ describe('Smartphone session time formatting (Issue #30)', () => {
     expect(formatSessionTime('garbage')).toBe('')
   })
 })
+
+describe('Session subtitle separator (Bug #41)', () => {
+  function formatSessionTime(iso: string): string {
+    try {
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      const now = new Date()
+      const hh = String(d.getHours()).padStart(2, '0')
+      const mi = String(d.getMinutes()).padStart(2, '0')
+      const time = `${hh}:${mi}`
+      const isToday = d.toDateString() === now.toDateString()
+      if (isToday) return `Today ${time}`
+      const yesterday = new Date(now)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const isYesterday = d.toDateString() === yesterday.toDateString()
+      if (isYesterday) return `Yesterday ${time}`
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      return `${months[d.getMonth()]} ${d.getDate()}, ${time}`
+    } catch {
+      return ''
+    }
+  }
+
+  /** Build the subtitle string exactly as SessionsScreen.tsx renders it */
+  function buildSubtitle(updatedAt: string, messageCount: number | undefined): string {
+    const time = formatSessionTime(updatedAt)
+    const sep = updatedAt ? ' · ' : ''
+    const count = messageCount ?? 0
+    const label = count === 1 ? 'message' : 'messages'
+    return `${time}${sep}${count} ${label}`
+  }
+
+  it('always includes separator when updated_at is set (even if message_count is 0)', () => {
+    const result = buildSubtitle('2026-04-14T18:30:00.000Z', 0)
+    // Must contain " · " separator — NOT concatenate time digits with count
+    expect(result).toContain(' · ')
+    expect(result).toContain('0 messages')
+    // Must NOT produce something like "23:220 messages"
+    expect(result).not.toMatch(/\d{3} messages/)
+  })
+
+  it('always includes separator when message_count is undefined', () => {
+    const result = buildSubtitle('2026-04-14T18:30:00.000Z', undefined)
+    expect(result).toContain(' · ')
+    expect(result).toContain('0 messages')
+  })
+
+  it('handles message_count of 1 with singular form', () => {
+    const result = buildSubtitle('2026-04-14T18:30:00.000Z', 1)
+    expect(result).toContain('1 message')
+    expect(result).not.toContain('1 messages')
+  })
+
+  it('handles message_count > 1 with plural form', () => {
+    const result = buildSubtitle('2026-04-14T18:30:00.000Z', 5)
+    expect(result).toContain('5 messages')
+  })
+
+  it('no separator when updated_at is empty', () => {
+    const result = buildSubtitle('', 3)
+    // time is empty, so no separator, just "3 messages"
+    expect(result).not.toContain(' · ')
+    expect(result).toContain('3 messages')
+  })
+})

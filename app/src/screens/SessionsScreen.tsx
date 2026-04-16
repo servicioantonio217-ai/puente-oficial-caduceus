@@ -79,8 +79,8 @@ export function SessionsScreen() {
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
                     {formatSessionTime(session.updated_at)}
-                    {session.updated_at && session.message_count ? ' · ' : ''}
-                    {session.message_count === 1 ? '1 message' : `${session.message_count ?? 0} messages`}
+                    {session.updated_at ? ' \u00b7 ' : ''}
+                    {session.message_count ?? 0} message{session.message_count === 1 ? '' : 's'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 ml-2">
