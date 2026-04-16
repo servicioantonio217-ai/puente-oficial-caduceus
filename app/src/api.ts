@@ -102,6 +102,21 @@ export async function deleteSession(config: BridgeConfig, id: string): Promise<v
   }
 }
 
+/** Delete multiple sessions in bulk. Returns the count of deleted sessions. */
+export async function bulkDeleteSessions(config: BridgeConfig, ids: string[]): Promise<number> {
+  const res = await fetchWithTimeout(`${config.url}/v1/sessions/bulk-delete`, {
+    method: 'POST',
+    headers: headers(config),
+    body: JSON.stringify({ session_ids: ids }),
+  })
+  if (!res.ok) {
+    const detail = await extractErrorMessage(res, `Failed to delete sessions: ${res.status}`)
+    throw new Error(detail)
+  }
+  const data = await res.json()
+  return data.deleted_count
+}
+
 /** Rename a session. */
 export async function renameSession(config: BridgeConfig, id: string, name: string): Promise<Session> {
   const res = await fetchWithTimeout(`${config.url}/v1/sessions/${id}`, {

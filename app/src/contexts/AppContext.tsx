@@ -48,6 +48,7 @@ interface AppContextValue {
   closeSession: () => void
   newSession: (name?: string) => Promise<void>
   removeSession: (id: string) => Promise<void>
+  bulkRemoveSessions: (ids: string[]) => Promise<void>
   renameSession: (id: string, name: string) => Promise<void>
   sendText: (content: string) => Promise<void>
   startRecording: () => void
@@ -215,6 +216,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete session')
+    }
+  }, [currentSession])
+
+  /** Delete multiple sessions at once via bulk API. */
+  const bulkRemoveSessions = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return
+    try {
+      await api.bulkDeleteSessions(configRef.current, ids)
+      setSessions((prev) => prev.filter((s) => !ids.includes(s.id)))
+      if (currentSession && ids.includes(currentSession.id)) {
+        setCurrentSession(null)
+        setMessages([])
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete sessions')
     }
   }, [currentSession])
 
@@ -475,7 +491,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLoading, isRecording, error,
         connect, disconnect,
         refreshSessions, openSession, closeSession,
-        newSession, removeSession, renameSession,
+        newSession, removeSession, bulkRemoveSessions, renameSession,
         sendText, startRecording, stopRecording, cancelRecording,
         logEntries, clearLogs,
       }}

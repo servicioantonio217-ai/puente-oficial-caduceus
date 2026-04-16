@@ -126,3 +126,58 @@ async def test_session_timestamps_utc_by_default(client):
     # Default timezone is UTC — timestamps should have +00:00
     assert "+00:00" in data["created_at"]
     assert "+00:00" in data["updated_at"]
+
+
+# --- Bulk delete tests ---
+
+
+async def test_bulk_delete_sessions(client):
+    """Bulk delete removes all specified sessions."""
+    ids = []
+    for i in range(3):
+        resp = await client.post("/v1/sessions", headers=HEADERS, json={"name": f"Bulk {i}"})
+        assert resp.status_code == 201
+        ids.append(resp.json()["id"])
+
+    response = await client.post(
+        "/v1/sessions/bulk-delete", headers=HEADERS,
+        json={"session_ids": ids[:2]},
+    )
+    assert response.status_code == 200
+    assert response.json()["deleted_count"] == 2
+
+    # Verify only the third session remains
+    list_resp = await client.get("/v1/sessions", headers=HEADERS)
+    assert list_resp.status_code == 200
+    remaining = [s["id"] for s in list_resp.json()]
+    assert ids[2] in remaining
+    assert ids[0] not in remaining
+    assert ids[1] not in remaining
+
+
+async def test_bulk_delete_nonexistent_ids(client):
+    """Bulk delete with non-existent IDs returns 0 deleted."""
+    response = await client.post(
+        "/v1/sessions/bulk-delete", headers=HEADERS,
+        json={"session_ids": ["fake-id-1", "fake-id-2"]},
+    )
+    assert response.status_code == 200
+    assert response.json()["deleted_count"] == 0
+
+
+async def test_bulk_delete_empty_list_rejected(client):
+    """Bulk delete with empty session_ids list is rejected (min_length=1)."""
+    response = await client.post(
+        "/v1/sessions/bulk-delete", headers=HEADERS,
+        json={"session_ids": []},
+    )
+    assert response.status_code == 422  # Validation error
+
+
+async def test_bulk_delete_auth_required(client):
+    """Bulk delete requires authentication."""
+    response = await client.post(
+        "/v1/sessions/bulk-delete",
+        json={"session_ids": ["some-id"]},
+    )
+    assert response.status_code == 401
