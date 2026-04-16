@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Request
 
@@ -25,7 +26,7 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _convert_session_row(settings: Settings, row: dict) -> SessionResponse:
+def _convert_session_row(settings: Settings, row: dict[str, Any]) -> SessionResponse:
     """Build a SessionResponse with timezone-converted timestamps."""
     return SessionResponse(
         id=row["id"],
@@ -38,8 +39,8 @@ def _convert_session_row(settings: Settings, row: dict) -> SessionResponse:
 
 def _convert_session_detail(
     settings: Settings,
-    session: dict,
-    messages: list[dict],
+    session: dict[str, Any],
+    messages: list[dict[str, Any]],
 ) -> SessionDetailResponse:
     """Build a SessionDetailResponse with timezone-converted timestamps."""
     return SessionDetailResponse(
