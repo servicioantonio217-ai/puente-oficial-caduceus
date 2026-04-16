@@ -7,7 +7,7 @@ import {
   useEffect,
   type ReactNode,
 } from 'react'
-import type { Session, ChatMessage, AgentResponse, BridgeConfig } from '../types'
+import type { Session, ChatMessage, AgentResponse, BridgeConfig, RecordingSettings } from '../types'
 import { useLogBuffer, type LogEntry } from '../hooks/useLogBuffer'
 
 /** Generate a UUID v4, with fallback for WebViews without crypto.randomUUID(). */
@@ -24,7 +24,7 @@ function uuid(): string {
 }
 
 import * as api from '../api'
-import { loadConfig, saveConfig } from '../storage'
+import { loadConfig, saveConfig, loadRecordingSettings, saveRecordingSettings } from '../storage'
 import { EvenAudioBridge } from '../audio'
 import { AudioRecorder } from '../audio/recorder'
 import { setupLifecycle } from '../lifecycle'
@@ -32,6 +32,8 @@ import { setupLifecycle } from '../lifecycle'
 interface AppContextValue {
   config: BridgeConfig
   setConfig: (config: BridgeConfig) => void
+  recordingSettings: RecordingSettings
+  setRecordingSettings: (settings: RecordingSettings) => void
   connected: boolean
   sessions: Session[]
   currentSession: Session | null
@@ -94,6 +96,7 @@ function extractAssistantText(response: AgentResponse): string {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [config, setConfigState] = useState<BridgeConfig>(loadConfig)
+  const [recordingSettings, setRecordingSettingsState] = useState<RecordingSettings>(loadRecordingSettings)
   const [connected, setConnected] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
@@ -107,6 +110,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const configRef = useRef(config)
   configRef.current = config
 
+  // Ref to recording settings so the async callback in startRecording
+  // always accesses the latest values without stale closure issues.
+  const recordingSettingsRef = useRef(recordingSettings)
+  recordingSettingsRef.current = recordingSettings
+
   // Keep a ref to currentSession so async callbacks (onRecordingComplete)
   // always access the latest session, even if the closure is stale.
   // This prevents sending audio to the wrong session after a session change.
@@ -118,6 +126,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setConfig = useCallback((c: BridgeConfig) => {
     setConfigState(c)
     saveConfig(c)
+  }, [])
+
+  const setRecordingSettings = useCallback((s: RecordingSettings) => {
+    setRecordingSettingsState(s)
+    saveRecordingSettings(s)
   }, [])
 
   /** Check bridge health and fetch sessions. */
@@ -276,7 +289,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // (sendAudio) would create a new bridge while the old one's callback
     // is still in-flight, leaving the UI in an inconsistent state.
     if (!currentSession || isRecording || isLoading) return
-    const recorder = new AudioRecorder()
+
+    // Build recorder options from user-configured recording settings.
+    // When auto-stop is disabled, set silenceTimeoutMs to Infinity so
+    // the VAD auto-stop logic in feedPCMSamples() never triggers.
+    const rs = recordingSettingsRef.current
+    const recorderOptions = {
+      silenceTimeoutMs: rs.autoStopEnabled ? rs.silenceTimeoutMs : Infinity,
+    }
+
+    const recorder = new AudioRecorder(recorderOptions)
 
     const bridge = new EvenAudioBridge({
       recorder,
@@ -438,6 +460,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider
       value={{
         config, setConfig,
+        recordingSettings, setRecordingSettings,
         connected, sessions,
         currentSession, messages,
         isLoading, isRecording, error,

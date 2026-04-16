@@ -36,6 +36,14 @@ export interface BridgeConfig {
   token: string
 }
 
+/** Recording behaviour settings (persisted in localStorage). */
+export interface RecordingSettings {
+  /** Whether VAD auto-stop is enabled (default: true). */
+  autoStopEnabled: boolean
+  /** Silence duration in ms before auto-stop triggers (default: 1500, range: 500-5000). */
+  silenceTimeoutMs: number
+}
+
 /** App-wide state. */
 export interface AppState {
   connected: boolean

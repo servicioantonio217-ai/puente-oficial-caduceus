@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { loadConfig, saveConfig } from '../storage'
-import type { BridgeConfig } from '../types'
+import { loadConfig, saveConfig, loadRecordingSettings, saveRecordingSettings, DEFAULT_RECORDING_SETTINGS } from '../storage'
+import type { BridgeConfig, RecordingSettings } from '../types'
 
 const mockLocalStorage = (() => {
   let store: Record<string, string> = {}
@@ -20,7 +20,7 @@ beforeEach(() => {
   mockLocalStorage.setItem.mockClear()
 })
 
-describe('storage', () => {
+describe('storage — BridgeConfig', () => {
   it('returns defaults when nothing stored', () => {
     const config = loadConfig()
     expect(config).toEqual({ url: '', token: '' })
@@ -38,5 +38,95 @@ describe('storage', () => {
     mockLocalStorage.setItem('g2-caduceus-config', JSON.stringify({ url: 'http://x' }))
     const config = loadConfig()
     expect(config).toEqual({ url: '', token: '' })
+  })
+})
+
+describe('storage — RecordingSettings', () => {
+  it('returns defaults when nothing stored', () => {
+    const settings = loadRecordingSettings()
+    expect(settings).toEqual(DEFAULT_RECORDING_SETTINGS)
+    expect(settings).toEqual({ autoStopEnabled: true, silenceTimeoutMs: 1500 })
+  })
+
+  it('returns saved settings', () => {
+    const settings: RecordingSettings = { autoStopEnabled: false, silenceTimeoutMs: 3000 }
+    saveRecordingSettings(settings)
+
+    const loaded = loadRecordingSettings()
+    expect(loaded).toEqual(settings)
+  })
+
+  it('returns defaults for invalid JSON', () => {
+    mockLocalStorage.setItem('g2-caduceus-recording-settings', 'not-json')
+    const settings = loadRecordingSettings()
+    expect(settings).toEqual(DEFAULT_RECORDING_SETTINGS)
+  })
+
+  it('returns defaults for partial settings (missing autoStopEnabled)', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-recording-settings',
+      JSON.stringify({ silenceTimeoutMs: 2000 }),
+    )
+    const settings = loadRecordingSettings()
+    expect(settings).toEqual(DEFAULT_RECORDING_SETTINGS)
+  })
+
+  it('returns defaults for partial settings (missing silenceTimeoutMs)', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-recording-settings',
+      JSON.stringify({ autoStopEnabled: false }),
+    )
+    const settings = loadRecordingSettings()
+    expect(settings).toEqual(DEFAULT_RECORDING_SETTINGS)
+  })
+
+  it('clamps silenceTimeoutMs to minimum (500ms)', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-recording-settings',
+      JSON.stringify({ autoStopEnabled: true, silenceTimeoutMs: 100 }),
+    )
+    const settings = loadRecordingSettings()
+    expect(settings.silenceTimeoutMs).toBe(500)
+  })
+
+  it('clamps silenceTimeoutMs to maximum (5000ms)', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-recording-settings',
+      JSON.stringify({ autoStopEnabled: true, silenceTimeoutMs: 10000 }),
+    )
+    const settings = loadRecordingSettings()
+    expect(settings.silenceTimeoutMs).toBe(5000)
+  })
+
+  it('allows silenceTimeoutMs within valid range', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-recording-settings',
+      JSON.stringify({ autoStopEnabled: false, silenceTimeoutMs: 2500 }),
+    )
+    const settings = loadRecordingSettings()
+    expect(settings.autoStopEnabled).toBe(false)
+    expect(settings.silenceTimeoutMs).toBe(2500)
+  })
+
+  it('persists settings to localStorage', () => {
+    const settings: RecordingSettings = { autoStopEnabled: false, silenceTimeoutMs: 4000 }
+    saveRecordingSettings(settings)
+
+    expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+      'g2-caduceus-recording-settings',
+      JSON.stringify(settings),
+    )
+  })
+
+  it('does not affect BridgeConfig storage', () => {
+    const config: BridgeConfig = { url: 'http://x:8643', token: 'tok' }
+    saveConfig(config)
+
+    const settings: RecordingSettings = { autoStopEnabled: false, silenceTimeoutMs: 2000 }
+    saveRecordingSettings(settings)
+
+    // Both should load independently
+    expect(loadConfig()).toEqual(config)
+    expect(loadRecordingSettings()).toEqual(settings)
   })
 })
