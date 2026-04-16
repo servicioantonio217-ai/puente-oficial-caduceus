@@ -6,7 +6,7 @@ import type { AppSnapshot, AppActions } from '../shared'
 /**
  * Chat screen — AI chat display with recording controls.
  *
- * Header format: "Idle · 0 Messages"
+ * Header format: "Idle · 0 Messages" (singular "Message" for count 1)
  *   States: Idle, Recording, Thinking, Offline
  *
  * No separate ActionBar — the header conveys state, tap triggers record.
@@ -94,7 +94,9 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     else if (snapshot.isProcessing) actionLabel = 'Thinking'
     else actionLabel = 'Idle'
 
-    const title = fieldJoin(actionLabel, `${msgCount} Messages`)
+    // Use singular "Message" for count 1, plural "Messages" otherwise (#33)
+    const countLabel = msgCount === 1 ? '1 Message' : `${msgCount} Messages`
+    const title = fieldJoin(actionLabel, countLabel)
 
     // Empty state — clean, no prefix (type 'text' = no prefix in even-toolkit)
     const lines = msgCount > 0
