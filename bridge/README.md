@@ -116,7 +116,7 @@ All settings use environment variables with the `G2_` prefix. They can also be s
 
 | Variable | Default | Description |
 |---|---|---|
-| `G2_BRIDGE_TOKEN` | *(empty, required)* | Bearer token for client authentication (phone → bridge). Requests must include `Authorization: Bearer <token>`. |
+| `G2_BRIDGE_TOKEN` | *(empty, required)* | Bearer token for client authentication (phone → bridge). Requests must include `Authorization: Bearer *** |
 | `G2_AGENT_API_KEY` | *(empty, required)* | API key for the AI agent backend (bridge → agent). |
 | `G2_AGENT_API_URL` | `http://localhost:8642/v1` | AI agent Chat Completions API base URL. The bridge appends `/chat/completions` to this. |
 | `G2_STT_API_URL` | *(empty)* | STT endpoint URL (e.g., `http://litellm:4000/v1/audio/transcriptions`). Required for voice input. When empty, audio endpoints return 503. |
@@ -124,6 +124,7 @@ All settings use environment variables with the `G2_` prefix. They can also be s
 | `G2_STT_MODEL` | `whisper-1` | Model name sent to the STT endpoint in the `model` field. Override if your provider uses a different model identifier. |
 | `G2_DATABASE_PATH` | `/data/g2_bridge.db` | SQLite database file path. Parent directory is auto-created. |
 | `G2_MAX_RESPONSE_CHARS` | `500` | Maximum characters for agent response truncation. Responses exceeding this are cut at a sentence boundary with `...` appended. |
+| `G2_MAX_SESSIONS` | `100` | Max sessions before auto-eviction of oldest (LRU). Set to `0` for unlimited. |
 | `G2_MAX_AUDIO_BYTES` | `5242880` (5 MB) | Maximum audio file size accepted by the audio endpoint. Larger files return 413. |
 | `G2_MAX_CONTEXT_MESSAGES` | `50` | Maximum number of prior messages sent to the agent as conversation context. Prevents token overflow. |
 | `G2_AGENT_INSTRUCTIONS` | *(empty)* | Optional system prompt injected as the first message in every agent request. Use this to customize agent behavior (e.g., "Keep responses short and factual."). |

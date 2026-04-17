@@ -69,7 +69,12 @@ def _convert_session_detail(
 async def create_session(
     request: Request, body: CreateSessionRequest | None = None
 ) -> SessionResponse:
-    """Create a new chat session."""
+    """Create a new chat session.
+
+    If the number of sessions exceeds ``G2_MAX_SESSIONS``, the oldest
+    sessions are automatically evicted (LRU — least recently updated first)
+    to keep the total at the configured limit.
+    """
     from fastapi.security import HTTPBearer
 
     credentials = await HTTPBearer(auto_error=False)(request)
@@ -79,6 +84,21 @@ async def create_session(
     verify_client_token(credentials, settings)
 
     db: Database = request.app.state.db
+
+    # Auto-evict oldest sessions if we've reached the limit.
+    # Check count *before* creating the new session — once the new one is
+    # inserted the total would be limit+1, so evict when at the limit.
+    current_count = await db.count_sessions()
+    if current_count >= settings.max_sessions:
+        # Keep (limit - 1) so the new session brings total to exactly limit
+        evicted = await db.evict_oldest_sessions(settings.max_sessions - 1)
+        if evicted:
+            logger.info(
+                "Auto-evicted %d session(s) to stay within limit of %d",
+                len(evicted),
+                settings.max_sessions,
+            )
+
     session_id = str(uuid.uuid4())
     agent_conversation_id = str(uuid.uuid4())
     now = _now_iso()

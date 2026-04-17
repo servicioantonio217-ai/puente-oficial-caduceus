@@ -111,6 +111,99 @@ class TestSessionOperations:
         assert session["message_count"] == 0
 
 
+class TestSessionCountAndEviction:
+    """Tests for count_sessions, evict_oldest_sessions, and delete_message."""
+
+    @pytest.mark.asyncio
+    async def test_count_sessions_empty(self, db):
+        assert await db.count_sessions() == 0
+
+    @pytest.mark.asyncio
+    async def test_count_sessions_after_creates(self, db):
+        await db.create_session("s1", "A", "c1", "2026-01-01T00:00:00+00:00")
+        await db.create_session("s2", "B", "c2", "2026-01-02T00:00:00+00:00")
+        assert await db.count_sessions() == 2
+
+    @pytest.mark.asyncio
+    async def test_count_sessions_after_delete(self, db):
+        await db.create_session("s1", "A", "c1", "2026-01-01T00:00:00+00:00")
+        await db.delete_session("s1")
+        assert await db.count_sessions() == 0
+
+    @pytest.mark.asyncio
+    async def test_evict_oldest_keeps_newest(self, db):
+        """evict_oldest_sessions(keep=2) should delete the 2 oldest out of 4."""
+        for i in range(4):
+            await db.create_session(
+                f"s{i}", f"Session {i}", f"c{i}",
+                f"2026-01-0{i+1}T00:00:00+00:00",
+            )
+        evicted = await db.evict_oldest_sessions(keep=2)
+        assert len(evicted) == 2
+        # s0 and s1 have the oldest updated_at, so they should be evicted
+        assert set(evicted) == {"s0", "s1"}
+
+        remaining = await db.list_sessions()
+        assert len(remaining) == 2
+        remaining_ids = {s["id"] for s in remaining}
+        assert remaining_ids == {"s2", "s3"}
+
+    @pytest.mark.asyncio
+    async def test_evict_oldest_no_eviction_when_under_limit(self, db):
+        """evict_oldest_sessions(keep=10) with only 3 sessions → nothing evicted."""
+        for i in range(3):
+            await db.create_session(
+                f"s{i}", f"Session {i}", f"c{i}",
+                f"2026-01-0{i+1}T00:00:00+00:00",
+            )
+        evicted = await db.evict_oldest_sessions(keep=10)
+        assert evicted == []
+        assert await db.count_sessions() == 3
+
+    @pytest.mark.asyncio
+    async def test_evict_oldest_evicts_all(self, db):
+        """evict_oldest_sessions(keep=0) removes all sessions."""
+        await db.create_session("s1", "A", "c1", "2026-01-01T00:00:00+00:00")
+        await db.create_session("s2", "B", "c2", "2026-01-02T00:00:00+00:00")
+        evicted = await db.evict_oldest_sessions(keep=0)
+        assert len(evicted) == 2
+        assert await db.count_sessions() == 0
+
+    @pytest.mark.asyncio
+    async def test_evict_oldest_cascades_messages(self, db):
+        """Evicted sessions' messages should also be deleted (CASCADE)."""
+        await db.create_session("s1", "A", "c1", "2026-01-01T00:00:00+00:00")
+        await db.add_message("m1", "s1", "user", "Hello", "2026-01-01T00:00:01+00:00")
+        await db.create_session("s2", "B", "c2", "2026-01-02T00:00:00+00:00")
+        await db.evict_oldest_sessions(keep=1)
+        # s1 was oldest, should be evicted along with its messages
+        assert await db.get_session("s1") is None
+
+    @pytest.mark.asyncio
+    async def test_evict_oldest_lru_order(self, db):
+        """Eviction follows updated_at (LRU), not created_at."""
+        await db.create_session("s1", "Old", "c1", "2026-01-01T00:00:00+00:00")
+        await db.create_session("s2", "Mid", "c2", "2026-01-02T00:00:00+00:00")
+        await db.create_session("s3", "New", "c3", "2026-01-03T00:00:00+00:00")
+        # Touch s1 to make it the most recently updated
+        await db.update_session_timestamp("s1", "2026-06-01T00:00:00+00:00")
+        # Now LRU order is: s2 (old), s3 (mid), s1 (newest)
+        evicted = await db.evict_oldest_sessions(keep=1)
+        assert set(evicted) == {"s2", "s3"}
+        assert await db.get_session("s1") is not None
+
+    @pytest.mark.asyncio
+    async def test_delete_message(self, db):
+        await db.create_session("s1", "A", "c1", "2026-01-01T00:00:00+00:00")
+        await db.add_message("m1", "s1", "user", "Hello", "2026-01-01T00:00:01+00:00")
+        assert await db.delete_message("m1") is True
+        assert await db.get_messages("s1") == []
+
+    @pytest.mark.asyncio
+    async def test_delete_message_not_found(self, db):
+        assert await db.delete_message("nonexistent") is False
+
+
 class TestMessageOperations:
     @pytest.mark.asyncio
     async def test_add_message(self, db):
