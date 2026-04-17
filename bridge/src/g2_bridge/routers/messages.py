@@ -18,6 +18,7 @@ from g2_bridge.auth import (
 )
 from g2_bridge.context import build_history
 from g2_bridge.database import Database
+from g2_bridge.lock import SessionLock
 from g2_bridge.models import AgentResponse, SendMessageRequest
 from g2_bridge.response import truncate_response
 
@@ -47,6 +48,7 @@ async def send_message(
 
     db: Database = request.app.state.db
     agent: AgentClient = request.app.state.agent
+    lock: SessionLock = request.app.state.session_lock
 
     # Verify session exists
     session = await db.get_session(session_id)
@@ -66,65 +68,72 @@ async def send_message(
         },
     )
 
-    # Load conversation history from DB
-    stored_messages = await db.get_messages(session_id)
-    history = build_history(stored_messages, settings.max_context_messages)
+    # Serialize per-session — prevents concurrent requests from reading
+    # the same history snapshot and dropping context (issue #58).
+    async with lock.acquire(session_id):
+        # Store user message BEFORE calling the agent so concurrent (queued)
+        # requests see it in history.  If the agent call fails we clean up.
+        now = _now_iso()
+        user_msg_id = str(uuid.uuid4())
+        await db.add_message(user_msg_id, session_id, "user", body.content, now)
+        await db.update_session_timestamp(session_id, now)
 
-    logger.debug(
-        "Loaded conversation history: session=%s, messages=%d",
-        session_id,
-        len(history),
-        extra={"extra_fields": {"session_id": session_id, "history_count": str(len(history))}},
-    )
+        # Load conversation history from DB (now includes this user message)
+        stored_messages = await db.get_messages(session_id)
+        history = build_history(stored_messages[:-1], settings.max_context_messages)
 
-    # Forward to AI Agent BEFORE storing messages to avoid orphans
-    agent_start = time.monotonic()
-    try:
-        raw_response = await agent.send_message(body.content, history=history)
-    except Exception as e:
-        agent_latency = time.monotonic() - agent_start
-        logger.error(
-            "Agent request failed: session=%s, latency=%.1fs — %s",
+        logger.debug(
+            "Loaded conversation history: session=%s, messages=%d",
             session_id,
-            agent_latency,
-            e,
-            extra={"extra_fields": {"session_id": session_id, "latency_s": f"{agent_latency:.1f}"}},
+            len(history),
+            extra={"extra_fields": {"session_id": session_id, "history_count": str(len(history))}},
         )
-        status_code, detail = classify_httpx_error(e)
-        raise AuthError(status_code=status_code, detail=detail) from e
 
-    agent_latency = time.monotonic() - agent_start
-    agent_response = agent.parse_response(raw_response)
+        # Forward to AI Agent
+        agent_start = time.monotonic()
+        try:
+            raw_response = await agent.send_message(body.content, history=history)
+        except Exception as e:
+            agent_latency = time.monotonic() - agent_start
+            logger.error(
+                "Agent request failed: session=%s, latency=%.1fs — %s",
+                session_id,
+                agent_latency,
+                e,
+                extra={"extra_fields": {"session_id": session_id, "latency_s": f"{agent_latency:.1f}"}},
+            )
+            # Remove the orphaned user message — agent never saw it
+            await db.delete_message(user_msg_id)
+            status_code, detail = classify_httpx_error(e)
+            raise AuthError(status_code=status_code, detail=detail) from e
 
-    # Extract text from response
-    response_text = ""
-    for msg in agent_response.output:
-        for content in msg.content:
-            response_text += content.text
+        agent_latency = time.monotonic() - agent_start
+        agent_response = agent.parse_response(raw_response)
 
-    logger.info(
-        "Agent response: session=%s, chars=%d, latency=%.1fs",
-        session_id,
-        len(response_text),
-        agent_latency,
-        extra={
-            "extra_fields": {
-                "session_id": session_id,
-                "response_chars": str(len(response_text)),
-                "latency_s": f"{agent_latency:.1f}",
-            }
-        },
-    )
+        # Extract text from response
+        response_text = ""
+        for msg in agent_response.output:
+            for content in msg.content:
+                response_text += content.text
 
-    # Store both messages only after agent succeeds
-    now = _now_iso()
-    await db.add_message(str(uuid.uuid4()), session_id, "user", body.content, now)
-    await db.update_session_timestamp(session_id, now)
+        logger.info(
+            "Agent response: session=%s, chars=%d, latency=%.1fs",
+            session_id,
+            len(response_text),
+            agent_latency,
+            extra={
+                "extra_fields": {
+                    "session_id": session_id,
+                    "response_chars": str(len(response_text)),
+                    "latency_s": f"{agent_latency:.1f}",
+                }
+            },
+        )
 
-    # Store assistant message (adapted/truncated version)
-    original_len = len(response_text)
-    adapted_text = truncate_response(response_text, settings.max_response_chars)
-    await db.add_message(str(uuid.uuid4()), session_id, "assistant", adapted_text, now)
+        # Store assistant message
+        original_len = len(response_text)
+        adapted_text = truncate_response(response_text, settings.max_response_chars)
+        await db.add_message(str(uuid.uuid4()), session_id, "assistant", adapted_text, now)
 
     # Log truncation if it occurred
     if len(adapted_text) != original_len:

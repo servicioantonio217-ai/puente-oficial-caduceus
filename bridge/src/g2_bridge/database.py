@@ -211,6 +211,23 @@ class Database:
             logger.error("Failed to add message to session %s", session_id, exc_info=True)
             raise
 
+    async def delete_message(self, message_id: str) -> bool:
+        """Delete a single message by ID.
+
+        Used to clean up orphaned user messages when the agent call fails
+        after the user message was already stored (issue #58).
+        Returns True if a row was deleted.
+        """
+        try:
+            cursor = await self.connection.execute(
+                "DELETE FROM messages WHERE id = ?", (message_id,)
+            )
+            await self.connection.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            logger.error("Failed to delete message %s", message_id, exc_info=True)
+            raise
+
     async def get_messages(self, session_id: str) -> list[dict[str, Any]]:
         try:
             cursor = await self.connection.execute(
