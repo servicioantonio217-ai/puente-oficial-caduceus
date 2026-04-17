@@ -172,38 +172,38 @@ create:release:
   rules:
     - if: $CI_COMMIT_TAG
   before_script:
-    - apk add curl git
+    - apk add --no-cache curl git
   script:
-    - echo "Creating release for $CI_COMMIT_TAG"
-    # Source archive (respects .gitignore)
-    - git archive --format=zip --prefix=g2-caduceus-$CI_COMMIT_TAG/ -o g2-caduceus-$CI_COMMIT_TAG.zip HEAD
-    # Upload source archive to Generic Package Registry
+    - echo "Preparing release assets for $CI_COMMIT_TAG"
+    - git archive --format=zip --prefix=g2-caduceus-$CI_COMMIT_TAG/ -o source.zip HEAD
     - |
-      curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        --upload-file g2-caduceus-$CI_COMMIT_TAG.zip \
+      curl --silent --show-error --fail \
+        --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file source.zip \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/g2-caduceus/${CI_COMMIT_TAG}/g2-caduceus-${CI_COMMIT_TAG}.zip"
-    # Upload .ehpk to Generic Package Registry
     - |
-      curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+      curl --silent --show-error --fail \
+        --header "JOB-TOKEN: $CI_JOB_TOKEN" \
         --upload-file app/caduceus-${CI_COMMIT_TAG}.ehpk \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/g2-caduceus/${CI_COMMIT_TAG}/caduceus-${CI_COMMIT_TAG}.ehpk"
   release:
+    tag_name: $CI_COMMIT_TAG
     name: "Release $CI_COMMIT_TAG"
     description: |
-      ## G2 Caduceus $CI_COMMIT_TAG
+      ## G2 Caduceus ${CI_COMMIT_TAG}
 
-      ### Install
-      - **Container**: `podman pull $CI_REGISTRY_IMAGE/bridge:$CI_COMMIT_TAG`
-      - **App**: Download the .ehpk file and sideload via Even Realities App
-    tag_name: $CI_COMMIT_TAG
+      ### Bridge Server (Container)
+      ```sh
+      podman pull ${CI_REGISTRY_IMAGE}/bridge:${CI_COMMIT_TAG}
+      ```
+
+      ### Caduceus App
+      Download the `.ehpk` asset below and sideload via Even Realities App.
     assets:
       links:
-        - name: "Bridge Container Image"
-          url: "$CI_REGISTRY_IMAGE/bridge:$CI_COMMIT_TAG"
-          link_type: image
         - name: "Source Code (zip)"
-          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/g2-caduceus/$CI_COMMIT_TAG/g2-caduceus-$CI_COMMIT_TAG.zip"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/g2-caduceus/${CI_COMMIT_TAG}/g2-caduceus-${CI_COMMIT_TAG}.zip"
           link_type: package
         - name: "Caduceus App (.ehpk)"
-          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/g2-caduceus/$CI_COMMIT_TAG/caduceus-$CI_COMMIT_TAG.ehpk"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/g2-caduceus/${CI_COMMIT_TAG}/caduceus-${CI_COMMIT_TAG}.ehpk"
           link_type: package
