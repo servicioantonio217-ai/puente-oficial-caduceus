@@ -135,8 +135,10 @@ class TestSessionCountAndEviction:
         """evict_oldest_sessions(keep=2) should delete the 2 oldest out of 4."""
         for i in range(4):
             await db.create_session(
-                f"s{i}", f"Session {i}", f"c{i}",
-                f"2026-01-0{i+1}T00:00:00+00:00",
+                f"s{i}",
+                f"Session {i}",
+                f"c{i}",
+                f"2026-01-0{i + 1}T00:00:00+00:00",
             )
         evicted = await db.evict_oldest_sessions(keep=2)
         assert len(evicted) == 2
@@ -153,8 +155,10 @@ class TestSessionCountAndEviction:
         """evict_oldest_sessions(keep=10) with only 3 sessions → nothing evicted."""
         for i in range(3):
             await db.create_session(
-                f"s{i}", f"Session {i}", f"c{i}",
-                f"2026-01-0{i+1}T00:00:00+00:00",
+                f"s{i}",
+                f"Session {i}",
+                f"c{i}",
+                f"2026-01-0{i + 1}T00:00:00+00:00",
             )
         evicted = await db.evict_oldest_sessions(keep=10)
         assert evicted == []

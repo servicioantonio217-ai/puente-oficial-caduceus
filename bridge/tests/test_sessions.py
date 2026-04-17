@@ -222,15 +222,11 @@ async def test_auto_eviction_with_low_limit(app_with_state):
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # Create 3 sessions (fills the limit)
         for i in range(3):
-            resp = await ac.post(
-                "/v1/sessions", headers=HEADERS, json={"name": f"Session {i}"}
-            )
+            resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": f"Session {i}"})
             assert resp.status_code == 201
 
         # Create 4th session — should evict the oldest (Session 0)
-        resp = await ac.post(
-            "/v1/sessions", headers=HEADERS, json={"name": "Session 3"}
-        )
+        resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": "Session 3"})
         assert resp.status_code == 201
 
         # Verify only 3 sessions remain
@@ -255,9 +251,7 @@ async def test_auto_eviction_respects_lru_order(app_with_state):
         # Create 3 sessions
         ids = []
         for i in range(3):
-            resp = await ac.post(
-                "/v1/sessions", headers=HEADERS, json={"name": f"S{i}"}
-            )
+            resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": f"S{i}"})
             ids.append(resp.json()["id"])
 
         # Touch S0 to make it most recently updated
@@ -301,9 +295,7 @@ async def test_bulk_delete_no_max_limit(app_with_state):
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         ids = []
         for i in range(101):
-            resp = await ac.post(
-                "/v1/sessions", headers=HEADERS, json={"name": f"Bulk {i}"}
-            )
+            resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": f"Bulk {i}"})
             ids.append(resp.json()["id"])
 
         # Bulk delete all 101 — should succeed (no max_length cap)
