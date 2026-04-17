@@ -184,3 +184,14 @@ async def test_bulk_delete_auth_required(client):
         json={"session_ids": ["some-id"]},
     )
     assert response.status_code == 401
+
+
+async def test_bulk_delete_max_100_ids(client):
+    """Bulk delete rejects more than 100 session IDs (422 validation)."""
+    ids = [f"fake-id-{i}" for i in range(101)]
+    response = await client.post(
+        "/v1/sessions/bulk-delete",
+        headers=HEADERS,
+        json={"session_ids": ids},
+    )
+    assert response.status_code == 422

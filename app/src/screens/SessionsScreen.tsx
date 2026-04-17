@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import { useApp } from '../contexts/AppContext'
 import type { Session } from '../types'
@@ -36,7 +36,7 @@ function formatSessionTime(iso: string): string {
 }
 
 export function SessionsScreen() {
-  const { sessions, openSession, removeSession, bulkRemoveSessions, renameSession, newSession, isLoading } = useApp()
+  const { sessions, openSession, removeSession, bulkRemoveSessions, renameSession, newSession, isLoading, refreshSessions } = useApp()
   const navigate = useNavigate()
 
   /** Whether the user is in multi-select mode. */
@@ -45,6 +45,8 @@ export function SessionsScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   /** Whether a bulk delete is in progress. */
   const [isDeleting, setIsDeleting] = useState(false)
+  /** Local error state for bulk operations — shown on this screen. */
+  const [localError, setLocalError] = useState<string | null>(null)
 
   const handleNew = () => {
     newSession()
@@ -76,19 +78,41 @@ export function SessionsScreen() {
     setSelectedIds(new Set())
   }
 
-  const exitSelectMode = () => {
+  const exitSelectMode = useCallback(() => {
     setSelectMode(false)
     setSelectedIds(new Set())
-  }
+    setLocalError(null)
+  }, [])
 
+  /**
+   * Handle bulk delete of selected sessions.
+   *
+   * Previously, errors from bulkRemoveSessions were only set on the
+   * global error state (AppContext.error) which is displayed exclusively
+   * on ChatScreen — invisible on SessionsScreen. This meant bulk delete
+   * failures appeared "silent" to the user.
+   *
+   * Fix: track a local error state and display it inline on this screen.
+   * Also refresh the session list from the server after successful delete
+   * to catch any inconsistency between local state and server state.
+   */
   const handleBulkDelete = async () => {
     const count = selectedIds.size
     if (!confirm(`Delete ${count} session${count !== 1 ? 's' : ''}? This cannot be undone.`)) return
 
     setIsDeleting(true)
+    setLocalError(null)
     try {
       await bulkRemoveSessions([...selectedIds])
+      // Refresh from server to ensure state matches backend
+      // (catches edge cases where local filtering misses something)
+      await refreshSessions()
       exitSelectMode()
+    } catch (e) {
+      // Show the error locally — the global error is also set by
+      // bulkRemoveSessions, but that's only visible on ChatScreen.
+      const msg = e instanceof Error ? e.message : 'Failed to delete sessions'
+      setLocalError(msg)
     } finally {
       setIsDeleting(false)
     }
@@ -141,6 +165,21 @@ export function SessionsScreen() {
           </>
         )}
       </div>
+
+      {/* Local error banner — visible only on this screen.
+          Shows bulk delete errors that were previously invisible because
+          the global error state is only rendered on ChatScreen. */}
+      {localError && (
+        <div className="px-3 py-2 bg-negative/10 text-negative text-xs border-b border-negative/20 flex items-center justify-between">
+          <span className="truncate">{localError}</span>
+          <button
+            onClick={() => setLocalError(null)}
+            className="text-negative opacity-60 hover:opacity-100 ml-2 shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {sessions.length === 0 ? (
