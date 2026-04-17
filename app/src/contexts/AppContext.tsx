@@ -130,16 +130,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setConfig = useCallback((c: BridgeConfig) => {
     setConfigState(c)
-    saveConfigToBridge(c).then((ok) => {
-      if (!ok) console.warn('[Caduceus] Config bridge write failed — localStorage only')
-    })
+    saveConfigToBridge(c)
   }, [])
 
   const setRecordingSettings = useCallback((s: RecordingSettings) => {
     setRecordingSettingsState(s)
-    saveRecordingSettingsToBridge(s).then((ok) => {
-      if (!ok) console.warn('[Caduceus] Recording settings bridge write failed — localStorage only')
-    })
+    saveRecordingSettingsToBridge(s)
   }, [])
 
   /** Check bridge health and fetch sessions. */
