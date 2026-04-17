@@ -110,7 +110,7 @@ async def list_sessions(request: Request) -> list[SessionResponse]:
 
 
 @router.post("/bulk-delete", status_code=200)
-async def bulk_delete_sessions(request: Request, body: BulkDeleteRequest) -> dict:
+async def bulk_delete_sessions(request: Request, body: BulkDeleteRequest) -> dict[str, int]:
     """Delete multiple sessions in a single request.
 
     Accepts a list of session IDs and deletes them all atomically.
