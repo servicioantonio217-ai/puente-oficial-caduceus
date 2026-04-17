@@ -140,7 +140,12 @@ export function AppGlasses() {
     deriveScreen: screenMapper,
     appName: 'Caduceus',
     splash: appSplash,
-    getPageMode: () => 'text' as const,
+    // Home screen uses 'home' page mode — this enables the built-in
+    // shutdownOnHomeBack behavior: double-tap (DOUBLE_CLICK_EVENT → GO_BACK)
+    // on the home/root screen triggers showShutdownContainer(1), showing the
+    // system exit confirmation popup. Required by Even Realities app store.
+    // All other screens use 'text' mode for standard text-based display.
+    getPageMode: (screen) => screen === 'home' ? ('home' as const) : ('text' as const),
   })
 
   return null
