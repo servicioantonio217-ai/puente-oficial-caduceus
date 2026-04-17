@@ -223,7 +223,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [currentSession])
 
-  /** Delete multiple sessions at once via bulk API. */
+  /**
+   * Delete multiple sessions at once via bulk API.
+   *
+   * Throws on failure so the caller (SessionsScreen.handleBulkDelete) can
+   * display a local error message. Previously errors were silently caught
+   * here and only set on the global error state — which was invisible on
+   * the SessionsScreen.
+   */
   const bulkRemoveSessions = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return
     try {
@@ -234,7 +241,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setMessages([])
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete sessions')
+      const msg = e instanceof Error ? e.message : 'Failed to delete sessions'
+      setError(msg)
+      throw e // Re-throw so caller can show local error feedback
     }
   }, [currentSession])
 

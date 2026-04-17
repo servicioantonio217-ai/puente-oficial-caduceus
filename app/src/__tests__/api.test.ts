@@ -93,4 +93,63 @@ describe('api', () => {
       expect(JSON.parse(opts.body)).toEqual({ content: 'Hi' })
     })
   })
+
+  describe('bulkDeleteSessions', () => {
+    it('sends single batch for <=100 IDs', async () => {
+      const ids = ['id-1', 'id-2', 'id-3']
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ deleted_count: 3 }) })
+
+      const result = await api.bulkDeleteSessions(config, ids)
+      expect(result).toBe(3)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toBe('http://localhost:8643/v1/sessions/bulk-delete')
+      expect(opts.method).toBe('POST')
+      expect(JSON.parse(opts.body)).toEqual({ session_ids: ids })
+    })
+
+    it('batches into multiple requests for >100 IDs', async () => {
+      // Generate 250 IDs to require 3 batches (100 + 100 + 50)
+      const ids = Array.from({ length: 250 }, (_, i) => `id-${i}`)
+
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ deleted_count: 100 }) })
+
+      const result = await api.bulkDeleteSessions(config, ids)
+      expect(result).toBe(300) // 3 batches × 100
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+
+      // First batch: ids 0-99
+      const batch1Body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(batch1Body.session_ids).toHaveLength(100)
+      expect(batch1Body.session_ids[0]).toBe('id-0')
+      expect(batch1Body.session_ids[99]).toBe('id-99')
+
+      // Second batch: ids 100-199
+      const batch2Body = JSON.parse(mockFetch.mock.calls[1][1].body)
+      expect(batch2Body.session_ids).toHaveLength(100)
+      expect(batch2Body.session_ids[0]).toBe('id-100')
+
+      // Third batch: ids 200-249
+      const batch3Body = JSON.parse(mockFetch.mock.calls[2][1].body)
+      expect(batch3Body.session_ids).toHaveLength(50)
+      expect(batch3Body.session_ids[0]).toBe('id-200')
+    })
+
+    it('throws immediately on first batch failure', async () => {
+      const ids = Array.from({ length: 150 }, (_, i) => `id-${i}`)
+      mockFetch
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ deleted_count: 100 }) })
+        .mockResolvedValueOnce({ ok: false, status: 422, json: () => Promise.resolve({ detail: 'Too many' }) })
+
+      await expect(api.bulkDeleteSessions(config, ids)).rejects.toThrow('Too many')
+      expect(mockFetch).toHaveBeenCalledTimes(2) // First succeeded, second failed
+    })
+
+    it('throws on non-200 response', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 401 })
+
+      await expect(api.bulkDeleteSessions(config, ['id-1'])).rejects.toThrow('Failed to delete sessions: 401')
+    })
+  })
 })

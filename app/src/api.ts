@@ -102,19 +102,35 @@ export async function deleteSession(config: BridgeConfig, id: string): Promise<v
   }
 }
 
-/** Delete multiple sessions in bulk. Returns the count of deleted sessions. */
+/**
+ * Delete multiple sessions in bulk. Returns the count of deleted sessions.
+ *
+ * Handles >100 sessions by batching — the server's BulkDeleteRequest has
+ * a max_length=100 cap, so requests exceeding that limit are split into
+ * batches of 100. Each batch is sent sequentially; if any batch fails,
+ * the error propagates immediately.
+ */
 export async function bulkDeleteSessions(config: BridgeConfig, ids: string[]): Promise<number> {
-  const res = await fetchWithTimeout(`${config.url}/v1/sessions/bulk-delete`, {
-    method: 'POST',
-    headers: headers(config),
-    body: JSON.stringify({ session_ids: ids }),
-  })
-  if (!res.ok) {
-    const detail = await extractErrorMessage(res, `Failed to delete sessions: ${res.status}`)
-    throw new Error(detail)
+  const BATCH_SIZE = 100
+  let totalDeleted = 0
+
+  // Batch to avoid 422 validation error from BulkDeleteRequest max_length=100
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = ids.slice(i, i + BATCH_SIZE)
+    const res = await fetchWithTimeout(`${config.url}/v1/sessions/bulk-delete`, {
+      method: 'POST',
+      headers: headers(config),
+      body: JSON.stringify({ session_ids: batch }),
+    })
+    if (!res.ok) {
+      const detail = await extractErrorMessage(res, `Failed to delete sessions: ${res.status}`)
+      throw new Error(detail)
+    }
+    const data = await res.json()
+    totalDeleted += data.deleted_count
   }
-  const data = await res.json()
-  return data.deleted_count
+
+  return totalDeleted
 }
 
 /** Rename a session. */
