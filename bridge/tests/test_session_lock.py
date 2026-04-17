@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -108,7 +107,6 @@ class TestConcurrentMessages:
 
             # Mock agent to return different responses based on input
             call_count = 0
-            original_send = _agent.send_message
 
             async def mock_send(content, history=None):
                 nonlocal call_count
@@ -148,8 +146,13 @@ class TestConcurrentMessages:
             user_msgs = [m for m in messages if m["role"] == "user"]
             assistant_msgs = [m for m in messages if m["role"] == "assistant"]
 
-            assert len(user_msgs) == 2, f"Expected 2 user messages, got {len(user_msgs)}: {user_msgs}"
-            assert len(assistant_msgs) == 2, f"Expected 2 assistant messages, got {len(assistant_msgs)}: {assistant_msgs}"
+            assert len(user_msgs) == 2, (
+                f"Expected 2 user messages, got {len(user_msgs)}"
+            )
+            assert len(assistant_msgs) == 2, (
+                f"Expected 2 assistant messages, got"
+                f" {len(assistant_msgs)}"
+            )
 
             # Both user messages should be present
             user_contents = {m["content"] for m in user_msgs}
