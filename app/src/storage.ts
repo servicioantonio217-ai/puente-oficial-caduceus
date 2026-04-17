@@ -1,5 +1,5 @@
 import type { BridgeConfig, RecordingSettings } from './types'
-import { storageGet, storageSet } from 'even-toolkit/storage'
+import { storageGet, storageGetRaw, storageSet } from 'even-toolkit/storage'
 
 const STORAGE_KEY = 'g2-caduceus-config'
 const RECORDING_SETTINGS_KEY = 'g2-caduceus-recording-settings'
@@ -73,21 +73,36 @@ export async function loadConfigFromBridge(): Promise<BridgeConfig> {
   try {
     const cfg = await storageGet<BridgeConfig>(STORAGE_KEY, DEFAULT_CONFIG)
     if (cfg.url && cfg.token) {
+      console.debug('[Caduceus storage] Config loaded from bridge')
       // Cache in localStorage for instant sync reads on next mount.
       saveConfigToLocal(cfg)
       return cfg
     }
-  } catch { /* bridge unavailable — localStorage values already in use */ }
+    console.debug('[Caduceus storage] Bridge has no config stored')
+  } catch (err) {
+    console.warn('[Caduceus storage] loadConfigFromBridge failed:', err)
+  }
   return loadConfig()
 }
 
 /**
  * Save config to both localStorage (sync) and Even Hub bridge (async).
- * Fire-and-forget — errors are silently swallowed by even-toolkit.
+ * Fire-and-forget — even-toolkit swallows write errors internally.
+ * Verifies the write by reading back from bridge after a short delay.
  */
 export function saveConfigToBridge(config: BridgeConfig): void {
   saveConfigToLocal(config)
-  storageSet(STORAGE_KEY, config) // fire-and-forget, errors swallowed internally
+  storageSet(STORAGE_KEY, config)
+  // Verify write landed — read back and compare
+  setTimeout(() => {
+    storageGetRaw(STORAGE_KEY).then((raw) => {
+      if (!raw || raw === '') {
+        console.warn('[Caduceus storage] Config NOT persisted to bridge (empty after write)')
+      }
+    }).catch(() => {
+      console.warn('[Caduceus storage] Config bridge verify failed — bridge unavailable')
+    })
+  }, 500)
 }
 
 export async function loadRecordingSettingsFromBridge(): Promise<RecordingSettings> {
@@ -101,17 +116,31 @@ export async function loadRecordingSettingsFromBridge(): Promise<RecordingSettin
         autoStopEnabled: raw.autoStopEnabled,
         silenceTimeoutMs: Math.max(500, Math.min(5000, raw.silenceTimeoutMs)),
       }
+      console.debug('[Caduceus storage] Recording settings loaded from bridge')
       saveRecordingSettingsToLocal(settings)
       return settings
     }
-  } catch { /* bridge unavailable */ }
+    console.debug('[Caduceus storage] Bridge has no recording settings stored')
+  } catch (err) {
+    console.warn('[Caduceus storage] loadRecordingSettingsFromBridge failed:', err)
+  }
   return loadRecordingSettings()
 }
 
 /**
  * Save recording settings to both localStorage (sync) and Even Hub bridge (async).
+ * Verifies the write by reading back from bridge after a short delay.
  */
 export function saveRecordingSettingsToBridge(settings: RecordingSettings): void {
   saveRecordingSettingsToLocal(settings)
-  storageSet(RECORDING_SETTINGS_KEY, settings) // fire-and-forget
+  storageSet(RECORDING_SETTINGS_KEY, settings)
+  setTimeout(() => {
+    storageGetRaw(RECORDING_SETTINGS_KEY).then((raw) => {
+      if (!raw || raw === '') {
+        console.warn('[Caduceus storage] Recording settings NOT persisted to bridge (empty after write)')
+      }
+    }).catch(() => {
+      console.warn('[Caduceus storage] Recording settings bridge verify failed — bridge unavailable')
+    })
+  }, 500)
 }
