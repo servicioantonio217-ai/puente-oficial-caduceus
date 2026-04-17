@@ -87,9 +87,7 @@ class TestConcurrentMessages:
     """
 
     @pytest.mark.asyncio
-    async def test_concurrent_messages_both_stored(
-        self, app_with_state
-    ):
+    async def test_concurrent_messages_both_stored(self, app_with_state):
         """Two concurrent message requests both store user + assistant messages."""
         application, db, _agent = app_with_state
 
@@ -114,9 +112,7 @@ class TestConcurrentMessages:
                 # Return a response that includes the message number
                 return {
                     "id": f"resp-{call_count}",
-                    "choices": [
-                        {"message": {"content": f"Response to: {content}"}}
-                    ],
+                    "choices": [{"message": {"content": f"Response to: {content}"}}],
                     "usage": {"input_tokens": 10, "output_tokens": 5},
                 }
 
@@ -135,9 +131,7 @@ class TestConcurrentMessages:
                 send_msg("Second message"),
             )
 
-            assert all(r.status_code == 200 for r in responses), [
-                r.text for r in responses
-            ]
+            assert all(r.status_code == 200 for r in responses), [r.text for r in responses]
 
             # Verify both messages are stored in the database
             messages = await db.get_messages(session_id)
@@ -146,12 +140,9 @@ class TestConcurrentMessages:
             user_msgs = [m for m in messages if m["role"] == "user"]
             assistant_msgs = [m for m in messages if m["role"] == "assistant"]
 
-            assert len(user_msgs) == 2, (
-                f"Expected 2 user messages, got {len(user_msgs)}"
-            )
+            assert len(user_msgs) == 2, f"Expected 2 user messages, got {len(user_msgs)}"
             assert len(assistant_msgs) == 2, (
-                f"Expected 2 assistant messages, got"
-                f" {len(assistant_msgs)}"
+                f"Expected 2 assistant messages, got {len(assistant_msgs)}"
             )
 
             # Both user messages should be present
