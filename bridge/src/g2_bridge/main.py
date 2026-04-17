@@ -94,9 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.warning("STT not configured. Set G2_STT_API_URL for voice input.")
 
     if not settings.is_configured:
-        logger.warning(
-            "Bridge not fully configured. Set G2_BRIDGE_TOKEN and G2_AGENT_API_KEY."
-        )
+        logger.warning("Bridge not fully configured. Set G2_BRIDGE_TOKEN and G2_AGENT_API_KEY.")
 
     yield
 

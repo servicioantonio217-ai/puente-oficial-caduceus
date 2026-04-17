@@ -49,9 +49,7 @@ class _TextFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        ts = datetime.fromtimestamp(record.created, tz=UTC).strftime(
-            "%Y-%m-%d %H:%M:%S.%f"
-        )[:-3]
+        ts = datetime.fromtimestamp(record.created, tz=UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         level = f"{record.levelname:<5}"
         logger = record.name
 
