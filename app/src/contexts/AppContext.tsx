@@ -459,31 +459,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer)
   }, [error])
 
-  // Auto-connect on mount if config exists
-  useEffect(() => {
-    if (config.url && config.token) {
-      connect()
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // On mount, try to load config from Even Hub bridge storage.
-  // The bridge persists data across WebView reloads / app restarts,
-  // unlike browser localStorage which gets cleared.
-  // If bridge has config different from localStorage, update state.
+  // On mount: load persisted config from Even Hub bridge storage, then
+  // auto-connect. This replaces two separate effects that raced — the old
+  // auto-connect fired from localStorage (empty after WebView reload) before
+  // the async bridge load resolved, so the app never connected on reopen.
   useEffect(() => {
     let cancelled = false
     Promise.all([loadConfigFromBridge(), loadRecordingSettingsFromBridge()]).then(
       ([bridgeConfig, bridgeSettings]) => {
         if (cancelled) return
-        // Only update if bridge returned actual values (not empty defaults)
+
+        // Use bridge config if it has credentials, otherwise keep localStorage seed
+        const effectiveConfig = (bridgeConfig.url && bridgeConfig.token)
+          ? bridgeConfig
+          : configRef.current
+
         if (bridgeConfig.url && bridgeConfig.token) {
           setConfigState(bridgeConfig)
         }
         setRecordingSettingsState(bridgeSettings)
+
+        // Auto-connect with whatever config is now available
+        if (effectiveConfig.url && effectiveConfig.token) {
+          api.healthCheck(effectiveConfig).then((ok) => {
+            if (cancelled) return
+            setConnected(ok)
+            if (ok) {
+              api.listSessions(effectiveConfig).then((list) => {
+                if (!cancelled) setSessions(list)
+              }).catch(() => { /* non-fatal */ })
+            }
+          }).catch(() => { /* health check failed — stay disconnected */ })
+        }
       },
     ).catch(() => { /* bridge unavailable — localStorage values already in use */ })
     return () => { cancelled = true }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Foreground/background lifecycle: keep-alive, cleanup recording, reconnect
   useEffect(() => {
