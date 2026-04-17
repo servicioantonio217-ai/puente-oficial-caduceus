@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -59,6 +60,22 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
     if len(audio_data) == 0:
         raise AuthError(status_code=400, detail="Empty audio file")
 
+    # Log audio received (size, approximate duration at 16kHz mono 16-bit)
+    approx_duration = len(audio_data) / 32000  # 16kHz * 2 bytes
+    logger.info(
+        "Audio received: session=%s, size=%d bytes (~%.1fs)",
+        session_id,
+        len(audio_data),
+        approx_duration,
+        extra={
+            "extra_fields": {
+                "session_id": session_id,
+                "audio_bytes": str(len(audio_data)),
+                "approx_duration_s": f"{approx_duration:.1f}",
+            }
+        },
+    )
+
     db: Database = request.app.state.db
     agent: AgentClient = request.app.state.agent
     stt: STTClient = request.app.state.stt
@@ -69,27 +86,65 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
         raise AuthError(status_code=404, detail="Session not found")
 
     # Transcribe
+    stt_start = time.monotonic()
     try:
         transcript = await stt.transcribe(audio_data, file.filename or "audio.wav")
     except Exception as e:
-        logger.error("STT failed: %s", e)
+        stt_latency = time.monotonic() - stt_start
+        logger.error(
+            "STT transcription failed: session=%s, latency=%.1fs — %s",
+            session_id,
+            stt_latency,
+            e,
+            extra={
+                "extra_fields": {
+                    "session_id": session_id,
+                    "stt_latency_s": f"{stt_latency:.1f}",
+                }
+            },
+        )
         raise AuthError(status_code=502, detail=f"STT request failed: {e}") from e
+
+    stt_latency = time.monotonic() - stt_start
 
     if not transcript:
         raise AuthError(status_code=422, detail="STT returned empty transcript")
+
+    logger.info(
+        "STT transcript: session=%s, latency=%.1fs, text=%s",
+        session_id,
+        stt_latency,
+        transcript[:80],
+        extra={
+            "extra_fields": {
+                "session_id": session_id,
+                "stt_latency_s": f"{stt_latency:.1f}",
+                "transcript_length": str(len(transcript)),
+            }
+        },
+    )
 
     # Load conversation history from DB
     stored_messages = await db.get_messages(session_id)
     history = build_history(stored_messages, settings.max_context_messages)
 
     # Forward transcript to AI Agent BEFORE storing messages
+    agent_start = time.monotonic()
     try:
         raw_response = await agent.send_message(transcript, history=history)
     except Exception as e:
-        logger.error("Agent request failed: %s", e)
+        agent_latency = time.monotonic() - agent_start
+        logger.error(
+            "Agent request failed: session=%s, latency=%.1fs — %s",
+            session_id,
+            agent_latency,
+            e,
+            extra={"extra_fields": {"session_id": session_id, "latency_s": f"{agent_latency:.1f}"}},
+        )
         status_code, detail = classify_httpx_error(e)
         raise AuthError(status_code=status_code, detail=detail) from e
 
+    agent_latency = time.monotonic() - agent_start
     agent_response = agent.parse_response(raw_response)
 
     # Extract text from response
@@ -98,14 +153,45 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
         for content in msg.content:
             response_text += content.text
 
+    logger.info(
+        "Agent response (audio): session=%s, chars=%d, latency=%.1fs",
+        session_id,
+        len(response_text),
+        agent_latency,
+        extra={
+            "extra_fields": {
+                "session_id": session_id,
+                "response_chars": str(len(response_text)),
+                "latency_s": f"{agent_latency:.1f}",
+            }
+        },
+    )
+
     # Store both messages only after agent succeeds
     now = _now_iso()
     await db.add_message(str(uuid.uuid4()), session_id, "user", transcript, now)
     await db.update_session_timestamp(session_id, now)
 
     # Store assistant message (adapted/truncated version)
+    original_len = len(response_text)
     adapted_text = truncate_response(response_text, settings.max_response_chars)
     await db.add_message(str(uuid.uuid4()), session_id, "assistant", adapted_text, now)
+
+    # Log truncation if it occurred
+    if len(adapted_text) != original_len:
+        logger.info(
+            "Response adapted: session=%s, %d -> %d chars",
+            session_id,
+            original_len,
+            len(adapted_text),
+            extra={
+                "extra_fields": {
+                    "session_id": session_id,
+                    "original_chars": str(original_len),
+                    "adapted_chars": str(len(adapted_text)),
+                }
+            },
+        )
 
     # Adapt response for G2 display
     if agent_response.output:

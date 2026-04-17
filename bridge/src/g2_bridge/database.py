@@ -47,11 +47,13 @@ class Database:
         await self._connection.execute("PRAGMA foreign_keys=ON")
         await self._connection.executescript(_SCHEMA)
         await self._connection.commit()
+        logger.info("Database connected: %s", self.db_path)
 
     async def close(self) -> None:
         if self._connection:
             await self._connection.close()
             self._connection = None
+            logger.info("Database connection closed")
 
     @property
     def connection(self) -> aiosqlite.Connection:
@@ -71,6 +73,7 @@ class Database:
                 (session_id, name, now, now, agent_conversation_id),
             )
             await self.connection.commit()
+            logger.debug("DB: session created id=%s", session_id)
         except Exception:
             logger.error("Failed to create session %s", session_id, exc_info=True)
             raise
@@ -84,6 +87,7 @@ class Database:
                 "GROUP BY s.id ORDER BY s.updated_at DESC"
             )
             rows = await cursor.fetchall()
+            logger.debug("DB: listed %d sessions", len(rows))
             return [dict(row) for row in rows]
         except Exception:
             logger.error("Failed to list sessions", exc_info=True)
@@ -127,6 +131,7 @@ class Database:
                 (now, session_id),
             )
             await self.connection.commit()
+            logger.debug("DB: updated session timestamp id=%s", session_id)
         except Exception:
             logger.error(
                 "Failed to update session timestamp for %s",
@@ -197,6 +202,11 @@ class Database:
                 (message_id, session_id, role, content, now),
             )
             await self.connection.commit()
+            logger.debug(
+                "DB: message added session=%s role=%s",
+                session_id,
+                role,
+            )
         except Exception:
             logger.error("Failed to add message to session %s", session_id, exc_info=True)
             raise
