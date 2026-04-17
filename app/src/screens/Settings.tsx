@@ -60,49 +60,6 @@ export function Settings() {
 
   return (
     <main className="px-3 pt-4 pb-8 space-y-6">
-      {/* Bridge Connection */}
-      <SettingsGroup label="Bridge Server">
-        <div className="px-4 py-3 space-y-3">
-          <div className="space-y-1.5">
-            <span className="text-[13px] tracking-[-0.13px] text-text-dim">Server URL</span>
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="http://192.168.1.100:8643"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <span className="text-[13px] tracking-[-0.13px] text-text-dim">Client Token</span>
-            <Input
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              type="password"
-              placeholder="Enter your bridge token"
-            />
-            <p className="text-[11px] tracking-[-0.11px] text-text-muted">
-              Stored locally on your device. Never sent to third parties.
-            </p>
-          </div>
-        </div>
-        <div className="px-4 pb-3">
-          <Button
-            variant={connected ? "secondary" : "default"}
-            className="w-full"
-            onClick={handleConnect}
-            disabled={!url.trim() || !token.trim()}
-          >
-            {saved ? 'Saved ✓' : connected ? 'Disconnect' : 'Connect'}
-          </Button>
-        </div>
-        {connected && (
-          <ListItem
-            title="Status"
-            subtitle="Connected to bridge"
-            trailing={<span className="text-positive text-sm">●</span>}
-          />
-        )}
-      </SettingsGroup>
-
       {/* Recording Settings */}
       <SettingsGroup label="Recording">
         <div className="px-4 py-3 space-y-4">
@@ -145,6 +102,49 @@ export function Settings() {
             </div>
           )}
         </div>
+      </SettingsGroup>
+
+      {/* Bridge Connection */}
+      <SettingsGroup label="Bridge Server">
+        <div className="px-4 py-3 space-y-3">
+          <div className="space-y-1.5">
+            <span className="text-[13px] tracking-[-0.13px] text-text-dim">Server URL</span>
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="http://192.168.1.100:8643"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <span className="text-[13px] tracking-[-0.13px] text-text-dim">Client Token</span>
+            <Input
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              type="password"
+              placeholder="Enter your bridge token"
+            />
+            <p className="text-[11px] tracking-[-0.11px] text-text-muted">
+              Stored locally on your device. Never sent to third parties.
+            </p>
+          </div>
+        </div>
+        <div className="px-4 pb-3">
+          <Button
+            variant={connected ? "secondary" : "default"}
+            className="w-full"
+            onClick={handleConnect}
+            disabled={!url.trim() || !token.trim()}
+          >
+            {saved ? 'Saved ✓' : connected ? 'Disconnect' : 'Connect'}
+          </Button>
+        </div>
+        {connected && (
+          <ListItem
+            title="Status"
+            subtitle="Connected to bridge"
+            trailing={<span className="text-positive text-sm">●</span>}
+          />
+        )}
       </SettingsGroup>
 
       {/* Logs */}
