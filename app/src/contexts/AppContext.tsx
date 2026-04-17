@@ -494,7 +494,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
     ).catch(() => { /* bridge unavailable — localStorage values already in use */ })
     return () => { cancelled = true }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   // Foreground/background lifecycle: keep-alive, cleanup recording, reconnect
   useEffect(() => {
