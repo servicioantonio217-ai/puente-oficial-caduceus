@@ -1,7 +1,7 @@
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
-COPY pyproject.toml .
+COPY pyproject.toml src/ ./
 RUN pip install --no-cache-dir --prefix=/install .
 
 # --- Runtime ---
@@ -10,7 +10,6 @@ FROM python:3.11-slim
 WORKDIR /app
 
 COPY --from=builder /install /usr/local
-COPY src/ src/
 
 RUN useradd --create-home --shell /bin/false appuser
 
