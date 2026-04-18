@@ -44,7 +44,7 @@ cd bridge
 G2_BRIDGE_TOKEN=your-token \
 G2_AGENT_API_URL=http://localhost:8642/v1 \
 G2_AGENT_API_KEY=your-agent-key \
-  python -m uvicorn g2_bridge.main:app --host 0.0.0.0 --port 8000
+  python -m uvicorn g2_bridge.main:app --host 0.0.0.0 --port 8643
 ```
 
 > **Important:** Use `python -m uvicorn`, not bare `uvicorn`. This ensures the same Python interpreter that has `g2_bridge` installed runs the server.
@@ -52,7 +52,7 @@ G2_AGENT_API_KEY=your-agent-key \
 Verify the bridge is running:
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8643/health
 ```
 
 ### App (TypeScript)

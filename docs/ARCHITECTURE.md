@@ -415,7 +415,7 @@ g2-caduceus/
 # Option 1: Podman
 podman build -t g2-bridge ./bridge
 podman run -d \
-  -p 8643:8000 \
+  -p 8643:8643 \
   -e G2_AGENT_API_URL=http://localhost:8642/v1 \
   -e G2_AGENT_API_KEY=*** \
   -e G2_STT_API_URL=http://litellm:4000/v1/audio/transcriptions \

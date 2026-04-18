@@ -13,7 +13,7 @@ services:
   bridge:
     build: ./bridge
     ports:
-      - "8643:8000"
+      - "8643:8643"
     environment:
       - G2_BRIDGE_TOKEN=${G2_BRIDGE_TOKEN}
       - G2_AGENT_API_KEY=${G2_AGENT_API_KEY}

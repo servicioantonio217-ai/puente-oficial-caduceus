@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # Server
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8643
 
     # Auth — client token (phone → bridge)
     bridge_token: str = ""  # G2_BRIDGE_TOKEN — required

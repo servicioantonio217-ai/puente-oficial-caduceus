@@ -20,7 +20,7 @@ class TestSettings:
     def test_default_values(self):
         s = Settings()
         assert s.host == "0.0.0.0"
-        assert s.port == 8000
+        assert s.port == 8643
         assert s.bridge_token == ""
         assert s.agent_api_key == ""
         assert s.agent_api_url == "http://localhost:8642/v1"
