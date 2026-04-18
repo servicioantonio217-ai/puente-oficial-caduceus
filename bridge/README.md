@@ -82,7 +82,7 @@ Build and run with Podman:
 ```bash
 podman build -t g2-bridge ./bridge
 podman run -d \
-  -p 8643:8000 \
+  -p 8643:8643 \
   -e G2_BRIDGE_TOKEN=*** \
   -e G2_AGENT_API_KEY=*** \
   -e G2_AGENT_API_URL=http://host.containers.internal:<agent-port>/v1 \
@@ -99,7 +99,7 @@ podman compose up -d
 ```
 
 **Notes:**
-- The container exposes port **8000** internally (mapped to 8643 in the example)
+- The container exposes port **8643** internally (mapped to 8643 in the example)
 - The SQLite database is stored at `/data/g2_bridge.db` inside the container — mount a volume for persistence
 - The container runs as a non-root user (`appuser`)
 - For accessing services on the host from within the container, use `host.containers.internal` instead of `localhost`
@@ -129,10 +129,10 @@ All settings use environment variables with the `G2_` prefix. They can also be s
 | `G2_MAX_CONTEXT_MESSAGES` | `50` | Maximum number of prior messages sent to the agent as conversation context. Prevents token overflow. |
 | `G2_AGENT_INSTRUCTIONS` | *(empty)* | Optional system prompt injected as the first message in every agent request. Use this to customize agent behavior (e.g., "Keep responses short and factual."). |
 | `G2_TIMEZONE` | `UTC` | IANA timezone for timestamp display (e.g., `Europe/Vienna`). All timestamps are stored as UTC and converted on output. Invalid values cause startup failure. |
-| `G2_HOST` | `0.0.0.0` | Server listen host. Set in Dockerfile, not in `config.py` — only affects the `uvicorn` command. |
-| `G2_PORT` | `8000` | Server listen port. Same as `G2_HOST` — set in Dockerfile, only affects the `uvicorn` command. |
+| `G2_HOST` | `0.0.0.0` | Server listen host. Part of the Python `Settings` model — read from env var by `main.py` and passed to uvicorn. |
+| `G2_PORT` | `8643` | Server listen port. Same as `G2_HOST` — read from env var by `main.py` and passed to uvicorn. |
 
-> **Note:** `G2_HOST` and `G2_PORT` are defined in the `Dockerfile` as defaults for the container's `CMD`. They are **not** part of the Python `Settings` model. When running locally, pass `--host` and `--port` to `uvicorn` directly.
+> **Note:** `G2_HOST` and `G2_PORT` are part of the Python `Settings` model (`config.py`) and are read from environment variables at startup. The `__main__` block in `main.py` passes them to uvicorn automatically. The Dockerfile sets sensible defaults (`8643` for port) — override at runtime via `-e G2_PORT=XXXX`.
 
 ### Minimum Required Configuration
 

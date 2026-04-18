@@ -214,3 +214,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 # For `uvicorn g2_bridge.main:app` usage
 app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    settings = Settings()
+    uvicorn.run("g2_bridge.main:app", host=settings.host, port=settings.port)
