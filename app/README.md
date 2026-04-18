@@ -16,7 +16,6 @@ For the full system architecture (Glasses → Phone → Bridge → Agent), see [
 | [Even Hub CLI](https://www.npmjs.com/package/@evenrealities/evenhub-cli) | `^0.1.11` | `npm install -g @evenrealities/evenhub-cli` |
 | Even Hub SDK | `^0.0.9` | Installed automatically with `npm install` |
 | even-toolkit | `^1.7.0` | Installed automatically with `npm install` |
-| Even Realities developer account | — | Register at [hub.evenrealities.com](https://hub.evenrealities.com) |
 | Even Realities App | — | Phone app with G2 glasses paired |
 | G2 Bridge server | — | Must be running and accessible from phone |
 
@@ -48,19 +47,18 @@ Settings are persisted in both `localStorage` (sync seed) and Even Hub bridge st
 For development, sideload the app directly to your G2 glasses via QR code for live hot-reload testing:
 
 ```bash
-# 1. Authenticate with Even Realities
-evenhub login -e your@email.com
-
-# 2. Start the dev server
+# 1. Start the dev server
 npm run dev   # serves on http://0.0.0.0:5173
 
-# 3. Find your local IP
+# 2. Find your local IP
 ip addr show | grep "inet " | grep -v 127.0.0.1   # Linux
 ipconfig getifaddr en0                             # macOS
 
-# 4. Generate QR code
+# 3. Generate QR code
 npx @evenrealities/evenhub-cli qr --url "http://192.168.x.x:5173"
 ```
+
+> **Note:** The `evenhub qr` command generates QR codes locally and does not require authentication. You only need an Even Realities developer account for uploading apps to the Hub (`evenhub upload`).
 
 Open the **Even Realities App** on your phone and scan the QR code. The app loads in the Even Hub WebView with hot module replacement — code changes are reflected instantly on the glasses.
 
@@ -351,7 +349,7 @@ See [`docs/CONTRIBUTING.md`](../docs/CONTRIBUTING.md) for code style, PR process
 | `npm install` fails with TypeScript errors | Use `npm install --legacy-peer-deps` — Even Hub SDK has a peer dep conflict |
 | QR scan fails, app doesn't load | Verify phone can reach `http://IP:5173` in its browser. Check firewall (port 5173 must be open) |
 | App loads but glasses show nothing | Ensure G2 glasses are paired and connected to the Even Realities App. Check Bluetooth |
-| `evenhub login` fails | You need an Even Realities developer account. Register at [hub.evenrealities.com](https://hub.evenrealities.com) |
+| `evenhub upload` fails | You need an Even Realities developer account. Register at [hub.evenrealities.com](https://hub.evenrealities.com) and run `evenhub login` |
 | Audio doesn't work in browser | `EvenAppBridge` audio is WebView-only. Use QR sideload for audio testing |
 | Settings lost after app restart | `localStorage` doesn't persist — settings are also saved to Even Hub bridge storage which survives restarts |
 | `npm ci` fails with lockfile mismatch | If you used `--legacy-peer-deps` locally: `rm -f package-lock.json && npm install`, then `npm ci --dry-run` to verify |
