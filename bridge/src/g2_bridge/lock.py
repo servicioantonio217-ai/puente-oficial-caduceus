@@ -51,5 +51,5 @@ class _AcquireContext:
         if self._lock is not None:
             self._lock.release()
             # Clean up lock if no one else is waiting
-            if not self._lock.locked() and not self._lock._waiters:  # type: ignore[attr-defined]
+            if not self._lock.locked() and not self._lock._waiters:
                 self._parent._locks.pop(self._session_id, None)

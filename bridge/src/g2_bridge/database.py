@@ -86,7 +86,7 @@ class Database:
                 "FROM sessions s LEFT JOIN messages m ON m.session_id = s.id "
                 "GROUP BY s.id ORDER BY s.updated_at DESC"
             )
-            rows = await cursor.fetchall()
+            rows = list(await cursor.fetchall())
             logger.debug("DB: listed %d sessions", len(rows))
             return [dict(row) for row in rows]
         except Exception:
@@ -230,18 +230,6 @@ class Database:
             return ids_to_evict
         except Exception:
             logger.error("Failed to evict oldest sessions", exc_info=True)
-            raise
-
-    async def delete_message(self, message_id: str) -> bool:
-        """Delete a single message by ID. Returns True if deleted."""
-        try:
-            cursor = await self.connection.execute(
-                "DELETE FROM messages WHERE id = ?", (message_id,)
-            )
-            await self.connection.commit()
-            return cursor.rowcount > 0
-        except Exception:
-            logger.error("Failed to delete message %s", message_id, exc_info=True)
             raise
 
     # --- Message operations ---
