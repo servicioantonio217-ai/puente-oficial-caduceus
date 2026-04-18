@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -19,6 +20,8 @@ from g2_bridge.models import (
     SessionDetailResponse,
     SessionResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
 
@@ -83,6 +86,12 @@ async def create_session(
 
     await db.create_session(session_id, name, agent_conversation_id, now)
 
+    logger.info(
+        "Session created: id=%s",
+        session_id,
+        extra={"extra_fields": {"session_id": session_id, "name": name}},
+    )
+
     return SessionResponse(
         id=session_id,
         name=name,
@@ -106,6 +115,8 @@ async def list_sessions(request: Request) -> list[SessionResponse]:
     db: Database = request.app.state.db
     rows = await db.list_sessions()
 
+    logger.debug("Listed %d sessions", len(rows))
+
     return [_convert_session_row(settings, row) for row in rows]
 
 
@@ -126,6 +137,12 @@ async def bulk_delete_sessions(request: Request, body: BulkDeleteRequest) -> dic
 
     db: Database = request.app.state.db
     deleted_count = await db.delete_sessions_bulk(body.session_ids)
+
+    logger.info(
+        "Bulk delete: %d sessions removed",
+        deleted_count,
+        extra={"extra_fields": {"deleted_count": str(deleted_count)}},
+    )
 
     return {"deleted_count": deleted_count}
 
@@ -148,6 +165,13 @@ async def get_session(request: Request, session_id: str) -> SessionDetailRespons
 
     messages = await db.get_messages(session_id)
 
+    logger.debug(
+        "Retrieved session: id=%s, messages=%d",
+        session_id,
+        len(messages),
+        extra={"extra_fields": {"session_id": session_id}},
+    )
+
     return _convert_session_detail(settings, session, messages)
 
 
@@ -168,6 +192,13 @@ async def rename_session(
     renamed = await db.rename_session(session_id, body.name)
     if not renamed:
         raise AuthError(status_code=404, detail="Session not found")
+
+    logger.info(
+        "Session renamed: id=%s -> %s",
+        session_id,
+        body.name,
+        extra={"extra_fields": {"session_id": session_id, "name": body.name}},
+    )
 
     session = await db.get_session(session_id)
     if session is None:
@@ -190,3 +221,9 @@ async def delete_session(request: Request, session_id: str) -> None:
     deleted = await db.delete_session(session_id)
     if not deleted:
         raise AuthError(status_code=404, detail="Session not found")
+
+    logger.info(
+        "Session deleted: id=%s",
+        session_id,
+        extra={"extra_fields": {"session_id": session_id}},
+    )

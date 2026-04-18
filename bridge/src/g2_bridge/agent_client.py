@@ -66,11 +66,27 @@ class AgentClient:
         logger.debug(
             "Sending to agent: %d history messages + 1 current",
             len(history) if history else 0,
+            extra={
+                "extra_fields": {
+                    "history_count": str(len(history) if history else 0),
+                    "total_messages": str(len(messages)),
+                }
+            },
         )
         response = await self._client.post("/chat/completions", json=payload)
 
         if response.status_code != 200:
-            logger.error("Agent returned %d: %s", response.status_code, response.text)
+            logger.error(
+                "Agent returned %d: %s",
+                response.status_code,
+                response.text[:200],
+                extra={
+                    "extra_fields": {
+                        "status_code": str(response.status_code),
+                        "body": response.text[:200],
+                    }
+                },
+            )
             response.raise_for_status()
 
         return dict(response.json())

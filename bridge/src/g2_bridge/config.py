@@ -7,6 +7,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Valid log levels accepted by Python's logging module
+_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
+
 
 def _resolve_tz(tz_name: str) -> ZoneInfo | None:
     """Resolve a timezone name to a ZoneInfo object.
@@ -60,9 +63,19 @@ class Settings(BaseSettings):
     # Display
     timezone: str = "UTC"  # G2_TIMEZONE — IANA timezone for timestamps (e.g. Europe/Vienna)
 
+    # Logging
+    log_level: str = "INFO"  # G2_LOG_LEVEL — DEBUG, INFO, WARNING, ERROR, CRITICAL
+    log_format: str = "text"  # G2_LOG_FORMAT — text or json
+
     def model_post_init(self, __context: object) -> None:
-        """Validate timezone setting after model initialization."""
+        """Validate settings after model initialization."""
         _resolve_tz(self.timezone)  # Raises ValueError if invalid
+        if self.log_level.upper() not in _LOG_LEVELS:
+            msg = f"Invalid log level: {self.log_level!r}. Must be one of {sorted(_LOG_LEVELS)}"
+            raise ValueError(msg)
+        if self.log_format not in ("text", "json"):
+            msg = f"Invalid log format: {self.log_format!r}. Must be 'text' or 'json'"
+            raise ValueError(msg)
 
     @property
     def is_configured(self) -> bool:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 import httpx
 
@@ -40,15 +41,32 @@ class STTClient:
         files = {"file": (filename, audio_data, "audio/wav")}
         data = {"model": self.settings.stt_model, "response_format": "text"}
 
-        logger.info("Sending audio to STT (%d bytes)", len(audio_data))
+        stt_start = time.monotonic()
+        logger.debug(
+            "Sending audio to STT: %d bytes, model=%s",
+            len(audio_data),
+            self.settings.stt_model,
+        )
+
         response = await self._client.post(
             self.settings.stt_api_url,
             files=files,
             data=data,
         )
+        stt_latency = time.monotonic() - stt_start
 
         if response.status_code != 200:
-            logger.error("STT returned %d: %s", response.status_code, response.text)
+            logger.error(
+                "STT returned %d: %s",
+                response.status_code,
+                response.text[:200],
+                extra={
+                    "extra_fields": {
+                        "status_code": str(response.status_code),
+                        "stt_latency_s": f"{stt_latency:.1f}",
+                    }
+                },
+            )
             response.raise_for_status()
 
         raw = response.text.strip()
@@ -65,5 +83,17 @@ class STTClient:
             transcript = raw
 
         transcript = transcript.strip()
-        logger.info("STT transcript: %s", transcript[:100])
+
+        logger.info(
+            "STT transcript: %s (latency=%.1fs, %d chars)",
+            transcript[:100],
+            stt_latency,
+            len(transcript),
+            extra={
+                "extra_fields": {
+                    "stt_latency_s": f"{stt_latency:.1f}",
+                    "transcript_length": str(len(transcript)),
+                }
+            },
+        )
         return transcript
