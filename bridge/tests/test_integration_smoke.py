@@ -52,9 +52,10 @@ def settings() -> Settings:
 
 @pytest.fixture
 async def app_with_state(settings: Settings):
-    """Create app with all services initialized (db, agent, stt)."""
+    """Create app with all services initialized (db, agent, stt, session_lock)."""
     from g2_bridge.agent_client import AgentClient
     from g2_bridge.database import Database
+    from g2_bridge.lock import SessionLock
     from g2_bridge.stt_client import STTClient
 
     application = create_app(settings)
@@ -65,6 +66,7 @@ async def app_with_state(settings: Settings):
     application.state.db = db
     application.state.agent = agent
     application.state.stt = stt
+    application.state.session_lock = SessionLock()
     yield application, db, agent, stt
     await stt.close()
     await agent.close()
@@ -353,6 +355,7 @@ async def test_audio_without_stt_config_returns_503(client: AsyncClient) -> None
     )
     from g2_bridge.agent_client import AgentClient
     from g2_bridge.database import Database
+    from g2_bridge.lock import SessionLock
     from g2_bridge.stt_client import STTClient
 
     application = create_app(no_stt_settings)
@@ -363,6 +366,7 @@ async def test_audio_without_stt_config_returns_503(client: AsyncClient) -> None
     application.state.db = db
     application.state.agent = agent
     application.state.stt = stt
+    application.state.session_lock = SessionLock()
 
     transport = ASGITransport(app=application)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

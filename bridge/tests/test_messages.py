@@ -80,6 +80,9 @@ async def test_send_message_truncation(client):
     agent = AgentClient(settings)
     app.state.db = db
     app.state.agent = agent
+    from g2_bridge.lock import SessionLock
+
+    app.state.session_lock = SessionLock()
 
     try:
         transport = ASGITransport(app=app)

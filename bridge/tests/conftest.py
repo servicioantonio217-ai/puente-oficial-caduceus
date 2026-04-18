@@ -13,14 +13,16 @@ from g2_bridge.main import create_app
 
 @asynccontextmanager
 async def _lifespan_test(settings: Settings):
-    """Minimal lifespan for tests — sets up db and agent on app state."""
+    """Minimal lifespan for tests — sets up db, agent, and session lock on app state."""
     from g2_bridge.agent_client import AgentClient
     from g2_bridge.database import Database
+    from g2_bridge.lock import SessionLock
 
     db = Database(settings.database_path)
     await db.connect()
     agent = AgentClient(settings)
-    yield db, agent
+    session_lock = SessionLock()
+    yield db, agent, session_lock
     await agent.close()
     await db.close()
 
@@ -37,11 +39,12 @@ def settings() -> Settings:
 
 @pytest.fixture
 async def app_with_state(settings: Settings):
-    """Create app with db and agent initialized. Returns (app, db, agent)."""
+    """Create app with db, agent, and session lock initialized. Returns (app, db, agent)."""
     application = create_app(settings)
-    async with _lifespan_test(settings) as (db, agent):
+    async with _lifespan_test(settings) as (db, agent, session_lock):
         application.state.db = db
         application.state.agent = agent
+        application.state.session_lock = session_lock
         yield application, db, agent
 
 

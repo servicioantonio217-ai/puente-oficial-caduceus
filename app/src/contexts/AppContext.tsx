@@ -321,12 +321,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /** Start voice recording via G2 glasses. */
   const startRecording = useCallback(() => {
-    // Guard: need an active session, must not already be recording,
-    // and must not be processing a previous recording's response.
-    // Without the isLoading check, a second tap during audio processing
-    // (sendAudio) would create a new bridge while the old one's callback
-    // is still in-flight, leaving the UI in an inconsistent state.
-    if (!currentSession || isRecording || isLoading) return
+    // Guard: need an active session and must not already be recording.
+    // We no longer block on isLoading — the server-side per-session lock
+    // (issue #58) serializes concurrent requests so the second message
+    // waits for the first to complete and sees it in conversation history.
+    if (!currentSession || isRecording) return
 
     // Build recorder options from user-configured recording settings.
     // When auto-stop is disabled, set silenceTimeoutMs to Infinity so
@@ -414,7 +413,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     audioBridgeRef.current = bridge
     setIsRecording(true)
     bridge.start()
-  }, [currentSession, isRecording, isLoading, refreshSessions])
+  }, [currentSession, isRecording, refreshSessions])
 
   /** Stop voice recording. */
   const stopRecording = useCallback(() => {

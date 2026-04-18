@@ -15,6 +15,7 @@ from g2_bridge.agent_client import AgentClient
 from g2_bridge.auth import AuthError
 from g2_bridge.config import Settings
 from g2_bridge.database import Database
+from g2_bridge.lock import SessionLock
 from g2_bridge.logging_config import configure_logging
 from g2_bridge.routers import audio, health, messages, sessions
 from g2_bridge.stt_client import STTClient
@@ -79,6 +80,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await db.connect()
     app.state.db = db
     logger.info("Database connected: %s", settings.database_path)
+
+    # Initialize per-session lock for serializing concurrent requests (issue #58)
+    session_lock = SessionLock()
+    app.state.session_lock = session_lock
 
     # Initialize agent client
     agent = AgentClient(settings)
