@@ -10,6 +10,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from g2_bridge.agent_client import AgentClient
 from g2_bridge.auth import AuthError
@@ -163,7 +165,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Request logging + timing middleware
     @app.middleware("http")
-    async def log_requests(request: Request, call_next):
+    async def log_requests(request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Skip health endpoint from request logging (too noisy)
         if request.url.path == "/health":
             return await call_next(request)

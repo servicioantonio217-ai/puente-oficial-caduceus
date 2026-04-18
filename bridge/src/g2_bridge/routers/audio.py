@@ -151,7 +151,12 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
                 session_id,
                 agent_latency,
                 e,
-                extra={"extra_fields": {"session_id": session_id, "latency_s": f"{agent_latency:.1f}"}},
+                extra={
+                    "extra_fields": {
+                        "session_id": session_id,
+                        "latency_s": f"{agent_latency:.1f}",
+                    }
+                },
             )
             # Remove the orphaned user message — agent never saw it
             await db.delete_message(user_msg_id)

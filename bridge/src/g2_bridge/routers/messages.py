@@ -100,7 +100,12 @@ async def send_message(
                 session_id,
                 agent_latency,
                 e,
-                extra={"extra_fields": {"session_id": session_id, "latency_s": f"{agent_latency:.1f}"}},
+                extra={
+                    "extra_fields": {
+                        "session_id": session_id,
+                        "latency_s": f"{agent_latency:.1f}",
+                    }
+                },
             )
             # Remove the orphaned user message — agent never saw it
             await db.delete_message(user_msg_id)
