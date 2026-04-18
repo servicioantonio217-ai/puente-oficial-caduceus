@@ -41,7 +41,7 @@
     41|
     42|## Reporting Issues
     43|
-    44|Open an issue on [GitLab](https://gitlab.pfandl.cloud/coding-agent/g2-caduceus/-/issues) with:
+    44|Open an issue on the project's GitLab issue tracker with:
     45|
     46|- Description of the issue or feature request
     47|- Steps to reproduce (for bugs)
