@@ -6,7 +6,7 @@ Thanks for your interest! This guide covers everything you need to go from clone
 
 ```bash
 # 1. Clone the repo
-git clone git@gitlab.pfandl.cloud:coding-agent/g2-caduceus.git
+git clone git@gitlab.example.com:group/project.git
 cd g2-caduceus
 
 # 2. Bridge setup (Python ≥ 3.11)
@@ -224,7 +224,7 @@ chore: update CI base images
 4. **MR description** should include:
    - What changed and why
    - How to test the changes
-   - Reference the issue: `Closes coding-agent/g2-caduceus#<iid>`
+   - Reference the issue: `Closes group/project#<iid>`
 
 5. **After merge**, clean up:
    ```bash
@@ -266,7 +266,7 @@ These are project-specific conventions that aren't obvious from the code alone:
 
 ## Reporting Issues
 
-Open an issue on the [GitLab issue tracker](https://gitlab.pfandl.cloud/coding-agent/g2-caduceus/-/issues) with:
+Open an issue on the [GitLab issue tracker](https://gitlab.example.com/group/project/-/issues) with:
 
 - Description of the issue or feature request
 - Steps to reproduce (for bugs)
