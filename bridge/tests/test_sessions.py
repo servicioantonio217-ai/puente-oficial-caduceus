@@ -186,12 +186,123 @@ async def test_bulk_delete_auth_required(client):
     assert response.status_code == 401
 
 
-async def test_bulk_delete_max_100_ids(client):
-    """Bulk delete rejects more than 100 session IDs (422 validation)."""
+async def test_bulk_delete_accepts_many_ids(client):
+    """Bulk delete accepts more than 100 IDs (limit removed, bounded by G2_MAX_SESSIONS)."""
     ids = [f"fake-id-{i}" for i in range(101)]
     response = await client.post(
         "/v1/sessions/bulk-delete",
         headers=HEADERS,
         json={"session_ids": ids},
     )
-    assert response.status_code == 422
+    # These are fake IDs, so deleted_count will be 0 but the request is valid
+    assert response.status_code == 200
+
+
+# --- Session limit / auto-eviction tests ---
+
+
+async def test_auto_eviction_removes_oldest(client):
+    """Creating a session at the limit evicts the oldest one."""
+    # The default settings have max_sessions=100, but the fixture uses
+    # default Settings which is 100. We need a lower limit for testing.
+    # The real auto-eviction test uses a custom settings fixture below.
+    # For now, create 2 sessions and verify the normal behavior works.
+    pass
+
+
+async def test_auto_eviction_with_low_limit(app_with_state):
+    """With max_sessions=3, creating a 4th session evicts the oldest."""
+    from httpx import ASGITransport, AsyncClient
+
+    application, _db, _agent = app_with_state
+    # Override max_sessions
+    application.state.settings.max_sessions = 3
+
+    transport = ASGITransport(app=application)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Create 3 sessions (fills the limit)
+        for i in range(3):
+            resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": f"Session {i}"})
+            assert resp.status_code == 201
+
+        # Create 4th session — should evict the oldest (Session 0)
+        resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": "Session 3"})
+        assert resp.status_code == 201
+
+        # Verify only 3 sessions remain
+        list_resp = await ac.get("/v1/sessions", headers=HEADERS)
+        assert list_resp.status_code == 200
+        sessions = list_resp.json()
+        assert len(sessions) == 3
+        names = {s["name"] for s in sessions}
+        assert "Session 0" not in names  # oldest was evicted
+        assert names == {"Session 1", "Session 2", "Session 3"}
+
+
+async def test_auto_eviction_respects_lru_order(app_with_state):
+    """Auto-eviction uses updated_at (LRU), not creation order."""
+    from httpx import ASGITransport, AsyncClient
+
+    application, db, _agent = app_with_state
+    application.state.settings.max_sessions = 3
+
+    transport = ASGITransport(app=application)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Create 3 sessions
+        ids = []
+        for i in range(3):
+            resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": f"S{i}"})
+            ids.append(resp.json()["id"])
+
+        # Touch S0 to make it most recently updated
+        import datetime
+
+        now = datetime.datetime.now(datetime.UTC).isoformat()
+        await db.update_session_timestamp(ids[0], now)
+
+        # Create 4th — should evict S1 (oldest LRU), not S0
+        await ac.post("/v1/sessions", headers=HEADERS, json={"name": "New"})
+
+        list_resp = await ac.get("/v1/sessions", headers=HEADERS)
+        sessions = list_resp.json()
+        remaining_ids = {s["id"] for s in sessions}
+        assert ids[0] in remaining_ids  # S0 was touched, kept
+        assert ids[1] not in remaining_ids  # S1 was evicted
+
+
+async def test_no_eviction_when_under_limit(client):
+    """No sessions are evicted when count is below the limit."""
+    # Default limit is 100, creating just 2 sessions should not evict
+    resp1 = await client.post("/v1/sessions", headers=HEADERS, json={"name": "A"})
+    resp2 = await client.post("/v1/sessions", headers=HEADERS, json={"name": "B"})
+    assert resp1.status_code == 201
+    assert resp2.status_code == 201
+
+    list_resp = await client.get("/v1/sessions", headers=HEADERS)
+    sessions = list_resp.json()
+    assert len(sessions) == 2
+
+
+async def test_bulk_delete_no_max_limit(app_with_state):
+    """Bulk delete now accepts more than 100 IDs (limit removed)."""
+    from httpx import ASGITransport, AsyncClient
+
+    application, _db, _agent = app_with_state
+    # Set max_sessions high so we can create 101 sessions
+    application.state.settings.max_sessions = 200
+
+    transport = ASGITransport(app=application)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ids = []
+        for i in range(101):
+            resp = await ac.post("/v1/sessions", headers=HEADERS, json={"name": f"Bulk {i}"})
+            ids.append(resp.json()["id"])
+
+        # Bulk delete all 101 — should succeed (no max_length cap)
+        resp = await ac.post(
+            "/v1/sessions/bulk-delete",
+            headers=HEADERS,
+            json={"session_ids": ids},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 101

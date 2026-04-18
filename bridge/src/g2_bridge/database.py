@@ -190,6 +190,60 @@ class Database:
             logger.error("Failed to bulk delete sessions", exc_info=True)
             raise
 
+    async def count_sessions(self) -> int:
+        """Return total number of sessions."""
+        try:
+            cursor = await self.connection.execute("SELECT COUNT(*) AS cnt FROM sessions")
+            row = await cursor.fetchone()
+            return int(dict(row)["cnt"]) if row else 0
+        except Exception:
+            logger.error("Failed to count sessions", exc_info=True)
+            raise
+
+    async def evict_oldest_sessions(self, keep: int) -> list[str]:
+        """Delete the oldest sessions, keeping only the newest ``keep`` sessions.
+
+        Sessions are ordered by ``updated_at DESC`` (newest first). We skip
+        the first ``keep`` rows and evict everything else — the least recently
+        used sessions (LRU policy).  Returns list of deleted session IDs.
+        """
+        if keep < 0:
+            keep = 0
+        try:
+            # Find IDs of sessions to evict (all except the newest `keep`)
+            # ORDER BY updated_at DESC: newest first. OFFSET `keep` skips them.
+            cursor = await self.connection.execute(
+                "SELECT id FROM sessions ORDER BY updated_at DESC LIMIT -1 OFFSET ?",
+                (keep,),
+            )
+            rows = await cursor.fetchall()
+            ids_to_evict = [dict(row)["id"] for row in rows]
+            if not ids_to_evict:
+                return []
+            placeholders = ",".join("?" for _ in ids_to_evict)
+            await self.connection.execute(
+                f"DELETE FROM sessions WHERE id IN ({placeholders})",
+                ids_to_evict,
+            )
+            await self.connection.commit()
+            logger.info("Evicted %d oldest session(s)", len(ids_to_evict))
+            return ids_to_evict
+        except Exception:
+            logger.error("Failed to evict oldest sessions", exc_info=True)
+            raise
+
+    async def delete_message(self, message_id: str) -> bool:
+        """Delete a single message by ID. Returns True if deleted."""
+        try:
+            cursor = await self.connection.execute(
+                "DELETE FROM messages WHERE id = ?", (message_id,)
+            )
+            await self.connection.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            logger.error("Failed to delete message %s", message_id, exc_info=True)
+            raise
+
     # --- Message operations ---
 
     async def add_message(
