@@ -44,6 +44,12 @@ export interface RecordingSettings {
   silenceTimeoutMs: number
 }
 
+/** Agent timeout settings (persisted in localStorage). */
+export interface AgentTimeoutSettings {
+  /** Custom agent timeout in seconds. 0 = use bridge's default (from /health). */
+  agentTimeoutSec: number
+}
+
 /** App-wide state. */
 export interface AppState {
   connected: boolean

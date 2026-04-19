@@ -7,8 +7,12 @@ import {
   useEffect,
   type ReactNode,
 } from 'react'
-import type { Session, ChatMessage, AgentResponse, BridgeConfig, RecordingSettings } from '../types'
+import type { Session, ChatMessage, AgentResponse, BridgeConfig, RecordingSettings, AgentTimeoutSettings } from '../types'
 import { useLogBuffer, type LogEntry } from '../hooks/useLogBuffer'
+import {
+  MIN_AGENT_TIMEOUT_SEC,
+  FALLBACK_AGENT_TIMEOUT_MS,
+} from '../storage'
 
 /** Generate a UUID v4, with fallback for WebViews without crypto.randomUUID(). */
 function uuid(): string {
@@ -28,6 +32,8 @@ import {
   loadConfig, saveConfigToBridge,
   loadRecordingSettings, saveRecordingSettingsToBridge,
   loadConfigFromBridge, loadRecordingSettingsFromBridge,
+  loadAgentTimeoutSettings, saveAgentTimeoutSettingsToBridge,
+  loadAgentTimeoutSettingsFromBridge,
 } from '../storage'
 import { EvenAudioBridge } from '../audio'
 import { AudioRecorder } from '../audio/recorder'
@@ -38,6 +44,10 @@ interface AppContextValue {
   setConfig: (config: BridgeConfig) => void
   recordingSettings: RecordingSettings
   setRecordingSettings: (settings: RecordingSettings) => void
+  agentTimeoutSettings: AgentTimeoutSettings
+  setAgentTimeoutSettings: (settings: AgentTimeoutSettings) => void
+  /** Effective agent timeout in ms (bridge-reported or user override). */
+  agentTimeoutMs: number
   connected: boolean
   sessions: Session[]
   currentSession: Session | null
@@ -99,9 +109,30 @@ function extractAssistantText(response: AgentResponse): string {
   return text.trim()
 }
 
+/**
+ * Compute the effective agent timeout in milliseconds.
+ *
+ * Priority:
+ * 1. User override (agentTimeoutSec > 0) — clamped to MIN_AGENT_TIMEOUT_SEC
+ * 2. Bridge-reported timeout (from /health response)
+ * 3. Fallback default (300s)
+ */
+function computeAgentTimeoutMs(
+  agentTimeoutSettings: AgentTimeoutSettings,
+  bridgeTimeoutMs: number,
+): number {
+  if (agentTimeoutSettings.agentTimeoutSec > 0) {
+    // User has set a custom override — enforce minimum
+    return Math.max(MIN_AGENT_TIMEOUT_SEC, agentTimeoutSettings.agentTimeoutSec) * 1000
+  }
+  // No user override — use bridge-reported timeout or fallback
+  return bridgeTimeoutMs > 0 ? bridgeTimeoutMs : FALLBACK_AGENT_TIMEOUT_MS
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [config, setConfigState] = useState<BridgeConfig>(loadConfig)
   const [recordingSettings, setRecordingSettingsState] = useState<RecordingSettings>(loadRecordingSettings)
+  const [agentTimeoutSettings, setAgentTimeoutSettingsState] = useState<AgentTimeoutSettings>(loadAgentTimeoutSettings)
   const [connected, setConnected] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
@@ -109,6 +140,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Bridge-reported timeout from /health (in ms). Updated on each health check.
+  const [bridgeTimeoutMs, setBridgeTimeoutMs] = useState(FALLBACK_AGENT_TIMEOUT_MS)
+
+  // Computed effective timeout
+  const agentTimeoutMs = computeAgentTimeoutMs(agentTimeoutSettings, bridgeTimeoutMs)
 
   const { entries: logEntries, clear: clearLogs } = useLogBuffer()
 
@@ -119,6 +156,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // always accesses the latest values without stale closure issues.
   const recordingSettingsRef = useRef(recordingSettings)
   recordingSettingsRef.current = recordingSettings
+
+  // Ref to agent timeout so async callbacks use the latest value
+  const agentTimeoutMsRef = useRef(agentTimeoutMs)
+  agentTimeoutMsRef.current = agentTimeoutMs
 
   // Keep a ref to currentSession so async callbacks (onRecordingComplete)
   // always access the latest session, even if the closure is stale.
@@ -138,15 +179,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveRecordingSettingsToBridge(s)
   }, [])
 
+  const setAgentTimeoutSettings = useCallback((s: AgentTimeoutSettings) => {
+    setAgentTimeoutSettingsState(s)
+    saveAgentTimeoutSettingsToBridge(s)
+  }, [])
+
   /** Check bridge health and fetch sessions. */
   const connect = useCallback(async () => {
     const c = configRef.current
     if (!c.url || !c.token) return
     setError(null)
     try {
-      const ok = await api.healthCheck(c)
-      setConnected(ok)
-      if (ok) {
+      const result = await api.healthCheck(c)
+      setConnected(result.ok)
+      setBridgeTimeoutMs(result.agentTimeoutMs)
+      if (result.ok) {
         const list = await api.listSessions(c)
         setSessions(list)
       }
@@ -288,6 +335,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         configRef.current,
         currentSession.id,
         content,
+        agentTimeoutMsRef.current,
       )
 
       // Extract assistant text from response with fallbacks
@@ -365,6 +413,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             configRef.current,
             session.id,
             blob,
+            agentTimeoutMsRef.current,
             (transcript: string) => {
               // Phase 1: Show transcript immediately — the user sees
               // what was understood while the agent is still thinking.
@@ -476,8 +525,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // the async bridge load resolved, so the app never connected on reopen.
   useEffect(() => {
     let cancelled = false
-    Promise.all([loadConfigFromBridge(), loadRecordingSettingsFromBridge()]).then(
-      ([bridgeConfig, bridgeSettings]) => {
+    Promise.all([
+      loadConfigFromBridge(),
+      loadRecordingSettingsFromBridge(),
+      loadAgentTimeoutSettingsFromBridge(),
+    ]).then(
+      ([bridgeConfig, bridgeSettings, timeoutSettings]) => {
         if (cancelled) return
 
         // Use bridge config if it has credentials, otherwise keep localStorage seed
@@ -489,13 +542,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setConfigState(bridgeConfig)
         }
         setRecordingSettingsState(bridgeSettings)
+        setAgentTimeoutSettingsState(timeoutSettings)
 
         // Auto-connect with whatever config is now available
         if (effectiveConfig.url && effectiveConfig.token) {
-          api.healthCheck(effectiveConfig).then((ok) => {
+          api.healthCheck(effectiveConfig).then((result) => {
             if (cancelled) return
-            setConnected(ok)
-            if (ok) {
+            setConnected(result.ok)
+            setBridgeTimeoutMs(result.agentTimeoutMs)
+            if (result.ok) {
               api.listSessions(effectiveConfig).then((list) => {
                 if (!cancelled) setSessions(list)
               }).catch(() => { /* non-fatal */ })
@@ -531,6 +586,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         config, setConfig,
         recordingSettings, setRecordingSettings,
+        agentTimeoutSettings, setAgentTimeoutSettings,
+        agentTimeoutMs,
         connected, sessions,
         currentSession, messages,
         isLoading, isRecording, error,
