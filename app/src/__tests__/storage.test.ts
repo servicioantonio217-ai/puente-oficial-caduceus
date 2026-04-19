@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   loadConfig, saveConfigToBridge,
   loadRecordingSettings, saveRecordingSettingsToBridge,
+  loadAgentTimeoutSettings, saveAgentTimeoutSettingsToBridge,
   DEFAULT_RECORDING_SETTINGS,
+  DEFAULT_AGENT_TIMEOUT_SETTINGS,
+  MIN_AGENT_TIMEOUT_SEC,
 } from '../storage'
-import type { BridgeConfig, RecordingSettings } from '../types'
+import type { BridgeConfig, RecordingSettings, AgentTimeoutSettings } from '../types'
 
 const mockLocalStorage = (() => {
   let store: Record<string, string> = {}
@@ -132,5 +135,76 @@ describe('storage — RecordingSettings', () => {
     // Both should load independently
     expect(loadConfig()).toEqual(config)
     expect(loadRecordingSettings()).toEqual(settings)
+  })
+})
+
+describe('storage — AgentTimeoutSettings', () => {
+  it('returns defaults when nothing stored', () => {
+    const settings = loadAgentTimeoutSettings()
+    expect(settings).toEqual(DEFAULT_AGENT_TIMEOUT_SETTINGS)
+    expect(settings).toEqual({ agentTimeoutSec: 0 })
+  })
+
+  it('returns saved settings', () => {
+    const settings: AgentTimeoutSettings = { agentTimeoutSec: 120 }
+    saveAgentTimeoutSettingsToBridge(settings)
+
+    const loaded = loadAgentTimeoutSettings()
+    expect(loaded).toEqual(settings)
+  })
+
+  it('returns defaults for invalid JSON', () => {
+    mockLocalStorage.setItem('g2-caduceus-agent-timeout', 'not-json')
+    const settings = loadAgentTimeoutSettings()
+    expect(settings).toEqual(DEFAULT_AGENT_TIMEOUT_SETTINGS)
+  })
+
+  it('returns defaults for partial settings (missing agentTimeoutSec)', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-agent-timeout',
+      JSON.stringify({}),
+    )
+    const settings = loadAgentTimeoutSettings()
+    expect(settings).toEqual(DEFAULT_AGENT_TIMEOUT_SETTINGS)
+  })
+
+  it('clamps agentTimeoutSec to minimum (0 — means auto)', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-agent-timeout',
+      JSON.stringify({ agentTimeoutSec: -5 }),
+    )
+    const settings = loadAgentTimeoutSettings()
+    expect(settings.agentTimeoutSec).toBe(0)
+  })
+
+  it('allows positive agentTimeoutSec', () => {
+    mockLocalStorage.setItem(
+      'g2-caduceus-agent-timeout',
+      JSON.stringify({ agentTimeoutSec: 600 }),
+    )
+    const settings = loadAgentTimeoutSettings()
+    expect(settings.agentTimeoutSec).toBe(600)
+  })
+
+  it('persists settings to localStorage', () => {
+    const settings: AgentTimeoutSettings = { agentTimeoutSec: 300 }
+    saveAgentTimeoutSettingsToBridge(settings)
+
+    expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+      'g2-caduceus-agent-timeout',
+      JSON.stringify(settings),
+    )
+  })
+
+  it('does not affect other storage keys', () => {
+    const config: BridgeConfig = { url: 'http://x:8643', token: 'tok' }
+    saveConfigToBridge(config)
+
+    const timeoutSettings: AgentTimeoutSettings = { agentTimeoutSec: 180 }
+    saveAgentTimeoutSettingsToBridge(timeoutSettings)
+
+    // Both should load independently
+    expect(loadConfig()).toEqual(config)
+    expect(loadAgentTimeoutSettings()).toEqual(timeoutSettings)
   })
 })

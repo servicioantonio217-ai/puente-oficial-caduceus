@@ -1,14 +1,30 @@
-import type { BridgeConfig, RecordingSettings } from './types'
+import type { BridgeConfig, RecordingSettings, AgentTimeoutSettings } from './types'
 import { storageGet, storageGetRaw, storageSet } from 'even-toolkit/storage'
 
 const STORAGE_KEY = 'g2-caduceus-config'
 const RECORDING_SETTINGS_KEY = 'g2-caduceus-recording-settings'
+const AGENT_TIMEOUT_KEY = 'g2-caduceus-agent-timeout'
 
 /** Default recording settings (matches AudioRecorder defaults). */
 export const DEFAULT_RECORDING_SETTINGS: RecordingSettings = {
   autoStopEnabled: true,
   silenceTimeoutMs: 1500,
 }
+
+/**
+ * Default agent timeout settings.
+ * agentTimeoutSec = 0 means "use bridge's reported timeout from /health".
+ * The user can override this to a specific value in Settings.
+ */
+export const DEFAULT_AGENT_TIMEOUT_SETTINGS: AgentTimeoutSettings = {
+  agentTimeoutSec: 0,
+}
+
+/** Minimum allowed agent timeout in seconds (prevents accidentally unusable short timeouts). */
+export const MIN_AGENT_TIMEOUT_SEC = 60
+
+/** Fallback agent timeout in milliseconds when the bridge doesn't report one. */
+export const FALLBACK_AGENT_TIMEOUT_MS = 300_000
 
 const DEFAULT_CONFIG: BridgeConfig = { url: '', token: '' }
 
@@ -56,6 +72,27 @@ export function loadRecordingSettings(): RecordingSettings {
 function saveRecordingSettingsToLocal(settings: RecordingSettings): void {
   try {
     localStorage.setItem(RECORDING_SETTINGS_KEY, JSON.stringify(settings))
+  } catch { /* ignore — localStorage may be unavailable */ }
+}
+
+export function loadAgentTimeoutSettings(): AgentTimeoutSettings {
+  try {
+    const raw = localStorage.getItem(AGENT_TIMEOUT_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (typeof parsed.agentTimeoutSec === 'number') {
+        return {
+          agentTimeoutSec: Math.max(0, parsed.agentTimeoutSec),
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return { ...DEFAULT_AGENT_TIMEOUT_SETTINGS }
+}
+
+function saveAgentTimeoutSettingsToLocal(settings: AgentTimeoutSettings): void {
+  try {
+    localStorage.setItem(AGENT_TIMEOUT_KEY, JSON.stringify(settings))
   } catch { /* ignore — localStorage may be unavailable */ }
 }
 
@@ -141,6 +178,45 @@ export function saveRecordingSettingsToBridge(settings: RecordingSettings): void
       }
     }).catch(() => {
       console.warn('[Caduceus storage] Recording settings bridge verify failed — bridge unavailable')
+    })
+  }, 500)
+}
+
+export async function loadAgentTimeoutSettingsFromBridge(): Promise<AgentTimeoutSettings> {
+  try {
+    const raw = await storageGet<Partial<AgentTimeoutSettings>>(
+      AGENT_TIMEOUT_KEY,
+      DEFAULT_AGENT_TIMEOUT_SETTINGS,
+    )
+    if (typeof raw.agentTimeoutSec === 'number') {
+      const settings: AgentTimeoutSettings = {
+        agentTimeoutSec: Math.max(0, raw.agentTimeoutSec),
+      }
+      console.debug('[Caduceus storage] Agent timeout settings loaded from bridge')
+      saveAgentTimeoutSettingsToLocal(settings)
+      return settings
+    }
+    console.debug('[Caduceus storage] Bridge has no agent timeout settings stored')
+  } catch (err) {
+    console.warn('[Caduceus storage] loadAgentTimeoutSettingsFromBridge failed:', err)
+  }
+  return loadAgentTimeoutSettings()
+}
+
+/**
+ * Save agent timeout settings to both localStorage (sync) and Even Hub bridge (async).
+ * Verifies the write by reading back from bridge after a short delay.
+ */
+export function saveAgentTimeoutSettingsToBridge(settings: AgentTimeoutSettings): void {
+  saveAgentTimeoutSettingsToLocal(settings)
+  storageSet(AGENT_TIMEOUT_KEY, settings)
+  setTimeout(() => {
+    storageGetRaw(AGENT_TIMEOUT_KEY).then((raw) => {
+      if (!raw || raw === '') {
+        console.warn('[Caduceus storage] Agent timeout settings NOT persisted to bridge (empty after write)')
+      }
+    }).catch(() => {
+      console.warn('[Caduceus storage] Agent timeout settings bridge verify failed — bridge unavailable')
     })
   }, 500)
 }

@@ -3,8 +3,13 @@ import type { Session, ChatMessage, AgentResponse, BridgeConfig } from './types'
 /** Default request timeout in milliseconds. */
 const REQUEST_TIMEOUT_MS = 30_000
 
-/** Agent responses can take much longer than regular API calls. */
-const AGENT_TIMEOUT_MS = 180_000
+/**
+ * Default agent response timeout in milliseconds.
+ * This is used when the bridge doesn't report an agent_timeout
+ * and the user hasn't configured a custom override.
+ * Matches the bridge's default G2_AGENT_TIMEOUT of 300s.
+ */
+const DEFAULT_AGENT_TIMEOUT_MS = 300_000
 
 /** Create a fetch with automatic timeout. */
 async function fetchWithTimeout(
@@ -41,13 +46,40 @@ function headers(config: BridgeConfig, json = true): Record<string, string> {
   return h
 }
 
-/** Check if the Bridge is reachable and configured. */
-export async function healthCheck(config: BridgeConfig): Promise<boolean> {
+/** Response shape from the /health endpoint. */
+interface HealthResponse {
+  status: string
+  version: string
+  agent_timeout: number // seconds, reported by bridge
+}
+
+/** Result of a health check — connection status + bridge-reported timeout. */
+export interface HealthResult {
+  ok: boolean
+  agentTimeoutMs: number
+}
+
+/**
+ * Check if the Bridge is reachable and configured.
+ *
+ * Returns the connection status and the bridge's agent_timeout
+ * (converted to ms) so the app can align its request timeout
+ * with the server-side wait duration.
+ */
+export async function healthCheck(config: BridgeConfig): Promise<HealthResult> {
   try {
     const res = await fetchWithTimeout(`${config.url}/health`)
-    return res.ok
+    if (!res.ok) return { ok: false, agentTimeoutMs: DEFAULT_AGENT_TIMEOUT_MS }
+
+    const data: HealthResponse = await res.json()
+    // Bridge reports timeout in seconds; convert to milliseconds
+    const agentTimeoutMs = data.agent_timeout > 0
+      ? data.agent_timeout * 1000
+      : DEFAULT_AGENT_TIMEOUT_MS
+
+    return { ok: true, agentTimeoutMs }
   } catch {
-    return false
+    return { ok: false, agentTimeoutMs: DEFAULT_AGENT_TIMEOUT_MS }
   }
 }
 
@@ -152,12 +184,13 @@ export async function sendMessage(
   config: BridgeConfig,
   sessionId: string,
   content: string,
+  agentTimeoutMs: number,
 ): Promise<AgentResponse> {
   const res = await fetchWithTimeout(`${config.url}/v1/sessions/${sessionId}/message`, {
     method: 'POST',
     headers: headers(config),
     body: JSON.stringify({ content }),
-  }, AGENT_TIMEOUT_MS)
+  }, agentTimeoutMs)
   if (!res.ok) {
     const detail = await extractErrorMessage(res, `Failed to send message: ${res.status}`)
     throw new Error(detail)
@@ -189,6 +222,7 @@ export async function sendAudio(
   config: BridgeConfig,
   sessionId: string,
   audioBlob: Blob,
+  agentTimeoutMs: number,
   onTranscript?: (text: string) => void,
 ): Promise<AudioStreamResult> {
   const formData = new FormData()
@@ -200,7 +234,7 @@ export async function sendAudio(
       Authorization: `Bearer ${config.token}`,
     },
     body: formData,
-  }, AGENT_TIMEOUT_MS)
+  }, agentTimeoutMs)
 
   if (!res.ok) {
     const detail = await extractErrorMessage(res, `Failed to send audio: ${res.status}`)

@@ -14,19 +14,45 @@ beforeEach(() => {
 
 describe('api', () => {
   describe('healthCheck', () => {
-    it('returns true on 200', async () => {
-      mockFetch.mockResolvedValue({ ok: true })
-      expect(await api.healthCheck(config)).toBe(true)
+    it('returns ok=true and agentTimeoutMs on 200', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: 'ok', version: '0.1.0', agent_timeout: 300 }),
+      })
+      const result = await api.healthCheck(config)
+      expect(result.ok).toBe(true)
+      expect(result.agentTimeoutMs).toBe(300_000)
     })
 
-    it('returns false on network error', async () => {
+    it('returns ok=false on network error', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'))
-      expect(await api.healthCheck(config)).toBe(false)
+      const result = await api.healthCheck(config)
+      expect(result.ok).toBe(false)
     })
 
-    it('returns false on non-200', async () => {
+    it('returns ok=false on non-200', async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 503 })
-      expect(await api.healthCheck(config)).toBe(false)
+      const result = await api.healthCheck(config)
+      expect(result.ok).toBe(false)
+    })
+
+    it('converts bridge agent_timeout from seconds to milliseconds', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: 'ok', version: '0.1.0', agent_timeout: 600 }),
+      })
+      const result = await api.healthCheck(config)
+      expect(result.agentTimeoutMs).toBe(600_000)
+    })
+
+    it('falls back to default when agent_timeout is 0', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: 'ok', version: '0.1.0', agent_timeout: 0 }),
+      })
+      const result = await api.healthCheck(config)
+      expect(result.ok).toBe(true)
+      expect(result.agentTimeoutMs).toBe(300_000) // default fallback
     })
   })
 
@@ -83,7 +109,7 @@ describe('api', () => {
       }
       mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(response) })
 
-      const result = await api.sendMessage(config, 'abc', 'Hi')
+      const result = await api.sendMessage(config, 'abc', 'Hi', 300_000)
       expect(result.id).toBe('resp-1')
       expect(result.output[0].content[0].text).toBe('Hello!')
 
@@ -133,7 +159,7 @@ describe('api', () => {
         ]),
       )
 
-      const result = await api.sendAudio(config, 'abc', new Blob(), transcriptCallback)
+      const result = await api.sendAudio(config, 'abc', new Blob(), 300_000, transcriptCallback)
 
       expect(result.transcript).toBe("what's the weather?")
       expect(result.response.id).toBe('resp-1')
@@ -167,7 +193,7 @@ describe('api', () => {
         ]),
       )
 
-      await api.sendAudio(config, 'abc', new Blob(), transcriptCallback)
+      const result = await api.sendAudio(config, 'abc', new Blob(), 300_000, transcriptCallback)
       callOrder.push('resolved')
 
       expect(callOrder).toEqual(['transcript', 'resolved'])
@@ -181,7 +207,7 @@ describe('api', () => {
         ]),
       )
 
-      await expect(api.sendAudio(config, 'abc', new Blob())).rejects.toThrow('Agent timeout')
+      await expect(api.sendAudio(config, 'abc', new Blob(), 300_000)).rejects.toThrow('Agent timeout')
     })
 
     it('throws when no transcript received', async () => {
@@ -196,7 +222,7 @@ describe('api', () => {
         mockSSEResponse([{ type: 'response', data: agentResponse }]),
       )
 
-      await expect(api.sendAudio(config, 'abc', new Blob())).rejects.toThrow('No transcript received')
+      await expect(api.sendAudio(config, 'abc', new Blob(), 300_000)).rejects.toThrow('No transcript received')
     })
 
     it('throws when no agent response received', async () => {
@@ -204,19 +230,19 @@ describe('api', () => {
         mockSSEResponse([{ type: 'transcript', text: 'hello' }]),
       )
 
-      await expect(api.sendAudio(config, 'abc', new Blob())).rejects.toThrow('No agent response received')
+      await expect(api.sendAudio(config, 'abc', new Blob(), 300_000)).rejects.toThrow('No agent response received')
     })
 
     it('throws on non-200 HTTP response', async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 401 })
 
-      await expect(api.sendAudio(config, 'abc', new Blob())).rejects.toThrow('Failed to send audio: 401')
+      await expect(api.sendAudio(config, 'abc', new Blob(), 300_000)).rejects.toThrow('Failed to send audio: 401')
     })
 
     it('throws when response body is null', async () => {
       mockFetch.mockResolvedValue({ ok: true, status: 200, body: null })
 
-      await expect(api.sendAudio(config, 'abc', new Blob())).rejects.toThrow('No response body')
+      await expect(api.sendAudio(config, 'abc', new Blob(), 300_000)).rejects.toThrow('No response body')
     })
 
     it('handles SSE events split across chunks', async () => {
@@ -237,7 +263,7 @@ describe('api', () => {
 
       mockFetch.mockResolvedValue({ ok: true, status: 200, body: stream })
 
-      const result = await api.sendAudio(config, 'abc', new Blob(), transcriptCallback)
+      const result = await api.sendAudio(config, 'abc', new Blob(), 300_000, transcriptCallback)
 
       expect(result.transcript).toBe('hello')
       expect(result.response.id).toBe('resp-4')
@@ -263,7 +289,7 @@ describe('api', () => {
 
       mockFetch.mockResolvedValue({ ok: true, status: 200, body: stream })
 
-      const result = await api.sendAudio(config, 'abc', new Blob(), transcriptCallback)
+      const result = await api.sendAudio(config, 'abc', new Blob(), 300_000, transcriptCallback)
 
       expect(result.transcript).toBe('hi')
       expect(result.response.id).toBe('resp-5')
@@ -285,7 +311,7 @@ describe('api', () => {
       )
 
       // No callback — should not throw
-      const result = await api.sendAudio(config, 'abc', new Blob())
+      const result = await api.sendAudio(config, 'abc', new Blob(), 300_000)
       expect(result.transcript).toBe('test')
       expect(result.response.id).toBe('resp-6')
     })
@@ -309,7 +335,6 @@ describe('api', () => {
     it('batches into multiple requests for >100 IDs', async () => {
       // Generate 250 IDs to require 3 batches (100 + 100 + 50)
       const ids = Array.from({ length: 250 }, (_, i) => `id-${i}`)
-
       mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ deleted_count: 100 }) })
 
       const result = await api.bulkDeleteSessions(config, ids)
