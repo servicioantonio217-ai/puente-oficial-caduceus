@@ -1,25 +1,26 @@
-"""Audio endpoint — receive WAV, transcribe, forward to AI Agent."""
+"""Audio endpoint — receive WAV, transcribe, forward to AI Agent via SSE."""
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request, UploadFile
+from fastapi.responses import StreamingResponse
 
 from g2_bridge.agent_client import AgentClient
 from g2_bridge.auth import (
     AuthError,
-    classify_httpx_error,
     verify_agent_configured,
     verify_client_token,
 )
 from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
-from g2_bridge.models import AudioResponse
 from g2_bridge.response import truncate_response
 from g2_bridge.stt_client import STTClient
 
@@ -32,9 +33,21 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-@router.post("/{session_id}/audio", response_model=AudioResponse)
-async def send_audio(request: Request, session_id: str, file: UploadFile) -> AudioResponse:
-    """Receive WAV audio, transcribe via STT, forward transcript to AI Agent."""
+def _sse_event(event_type: str, data: dict) -> str:
+    """Format a Server-Sent Event."""
+    payload = {"type": event_type, **data}
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+@router.post("/{session_id}/audio")
+async def send_audio(request: Request, session_id: str, file: UploadFile) -> StreamingResponse:
+    """Receive WAV audio, transcribe via STT, stream transcript and agent response via SSE.
+
+    SSE events:
+    - transcript: {"type": "transcript", "text": "..."} — sent immediately after STT
+    - response: {"type": "response", "data": {...}} — sent when agent responds
+    - error: {"type": "error", "message": "..."} — sent on agent failure
+    """
     from fastapi.security import HTTPBearer
 
     # Auth
@@ -126,93 +139,103 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Aud
         },
     )
 
-    # Serialize per-session — prevents concurrent requests from reading
-    # the same history snapshot and dropping context (issue #58).
-    async with lock.acquire(session_id):
-        # Store user message (transcript) BEFORE calling the agent so
-        # concurrent (queued) requests see it in history.
-        now = _now_iso()
-        user_msg_id = str(uuid.uuid4())
-        await db.add_message(user_msg_id, session_id, "user", transcript, now)
-        await db.update_session_timestamp(session_id, now)
+    # Store user message BEFORE starting the stream so it's persisted even if
+    # the connection breaks. This also makes it visible to concurrent requests
+    # that read history while we wait for the agent.
+    now = _now_iso()
+    user_msg_id = str(uuid.uuid4())
+    await db.add_message(user_msg_id, session_id, "user", transcript, now)
+    await db.update_session_timestamp(session_id, now)
 
-        # Load conversation history from DB (now includes this user message)
-        stored_messages = await db.get_messages(session_id)
-        history = build_history(stored_messages[:-1], settings.max_context_messages)
+    async def stream() -> AsyncIterator[str]:
+        """SSE stream: transcript first, then agent response."""
+        # Phase 1: Send transcript immediately
+        yield _sse_event("transcript", {"text": transcript})
 
-        # Forward transcript to AI Agent
-        agent_start = time.monotonic()
-        try:
-            raw_response = await agent.send_message(transcript, history=history)
-        except Exception as e:
+        # Phase 2: Call agent and stream response
+        # Serialize per-session — prevents concurrent requests from reading
+        # the same history snapshot and dropping context (issue #58).
+        async with lock.acquire(session_id):
+            # Load conversation history from DB (includes the user message
+            # we stored above)
+            stored_messages = await db.get_messages(session_id)
+            history = build_history(stored_messages[:-1], settings.max_context_messages)
+
+            # Forward transcript to AI Agent
+            agent_start = time.monotonic()
+            try:
+                raw_response = await agent.send_message(transcript, history=history)
+            except Exception as e:
+                agent_latency = time.monotonic() - agent_start
+                logger.error(
+                    "Agent request failed: session=%s, latency=%.1fs — %s",
+                    session_id,
+                    agent_latency,
+                    e,
+                    extra={
+                        "extra_fields": {
+                            "session_id": session_id,
+                            "latency_s": f"{agent_latency:.1f}",
+                        }
+                    },
+                )
+                # Remove the orphaned user message — agent never saw it
+                await db.delete_message(user_msg_id)
+                yield _sse_event("error", {"message": f"Agent request failed: {e}"})
+                return
+
             agent_latency = time.monotonic() - agent_start
-            logger.error(
-                "Agent request failed: session=%s, latency=%.1fs — %s",
+            agent_response = agent.parse_response(raw_response)
+
+            # Extract text from response
+            response_text = ""
+            for msg in agent_response.output:
+                for content in msg.content:
+                    response_text += content.text
+
+            logger.info(
+                "Agent response (audio): session=%s, chars=%d, latency=%.1fs",
                 session_id,
+                len(response_text),
                 agent_latency,
-                e,
                 extra={
                     "extra_fields": {
                         "session_id": session_id,
+                        "response_chars": str(len(response_text)),
                         "latency_s": f"{agent_latency:.1f}",
                     }
                 },
             )
-            # Remove the orphaned user message — agent never saw it
-            await db.delete_message(user_msg_id)
-            status_code, detail = classify_httpx_error(e)
-            raise AuthError(status_code=status_code, detail=detail) from e
 
-        agent_latency = time.monotonic() - agent_start
-        agent_response = agent.parse_response(raw_response)
+            # Store assistant message
+            original_len = len(response_text)
+            adapted_text = truncate_response(response_text, settings.max_response_chars)
+            await db.add_message(str(uuid.uuid4()), session_id, "assistant", adapted_text, now)
 
-        # Extract text from response
-        response_text = ""
-        for msg in agent_response.output:
-            for content in msg.content:
-                response_text += content.text
+        # Log truncation if it occurred
+        if len(adapted_text) != original_len:
+            logger.info(
+                "Response adapted: session=%s, %d -> %d chars",
+                session_id,
+                original_len,
+                len(adapted_text),
+                extra={
+                    "extra_fields": {
+                        "session_id": session_id,
+                        "original_chars": str(original_len),
+                        "adapted_chars": str(len(adapted_text)),
+                    }
+                },
+            )
 
-        logger.info(
-            "Agent response (audio): session=%s, chars=%d, latency=%.1fs",
-            session_id,
-            len(response_text),
-            agent_latency,
-            extra={
-                "extra_fields": {
-                    "session_id": session_id,
-                    "response_chars": str(len(response_text)),
-                    "latency_s": f"{agent_latency:.1f}",
-                }
-            },
-        )
+        # Adapt response for G2 display
+        if agent_response.output:
+            adapted_output = agent_response.output.copy()
+            for msg in adapted_output:
+                msg.content = [type(c)(type="output_text", text=adapted_text) for c in msg.content]
+            agent_response.output = adapted_output
 
-        # Store assistant message
-        original_len = len(response_text)
-        adapted_text = truncate_response(response_text, settings.max_response_chars)
-        await db.add_message(str(uuid.uuid4()), session_id, "assistant", adapted_text, now)
+        agent_response.conversation = session_id
+        yield _sse_event("response", {"data": agent_response.model_dump()})
 
-    # Log truncation if it occurred
-    if len(adapted_text) != original_len:
-        logger.info(
-            "Response adapted: session=%s, %d -> %d chars",
-            session_id,
-            original_len,
-            len(adapted_text),
-            extra={
-                "extra_fields": {
-                    "session_id": session_id,
-                    "original_chars": str(original_len),
-                    "adapted_chars": str(len(adapted_text)),
-                }
-            },
-        )
-
-    # Adapt response for G2 display
-    if agent_response.output:
-        adapted_output = agent_response.output.copy()
-        for msg in adapted_output:
-            msg.content = [type(c)(type="output_text", text=adapted_text) for c in msg.content]
-        agent_response.output = adapted_output
-
-    agent_response.conversation = session_id
-    return AudioResponse(transcript=transcript, response=agent_response)
+    return StreamingResponse(stream(), media_type="text/event-stream")

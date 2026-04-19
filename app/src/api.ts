@@ -165,12 +165,32 @@ export async function sendMessage(
   return res.json()
 }
 
-/** Upload WAV audio, get transcript + AI response. */
+/**
+ * Result of an audio upload via SSE streaming.
+ * The transcript is delivered first (via callback), the agent response follows.
+ */
+export interface AudioStreamResult {
+  transcript: string
+  response: AgentResponse
+}
+
+/**
+ * Upload WAV audio, receive transcript + AI response via SSE streaming.
+ *
+ * The audio endpoint returns a Server-Sent Events stream:
+ * - Event "transcript": sent immediately after STT (~1.4s)
+ * - Event "response": sent when the agent finishes
+ * - Event "error": sent on agent failure (after transcript was delivered)
+ *
+ * The `onTranscript` callback fires as soon as the transcript is available,
+ * allowing the UI to show the user's speech before the agent responds.
+ */
 export async function sendAudio(
   config: BridgeConfig,
   sessionId: string,
   audioBlob: Blob,
-): Promise<{ transcript: string; response: AgentResponse }> {
+  onTranscript?: (text: string) => void,
+): Promise<AudioStreamResult> {
   const formData = new FormData()
   formData.append('file', audioBlob, 'recording.wav')
 
@@ -181,9 +201,92 @@ export async function sendAudio(
     },
     body: formData,
   }, AGENT_TIMEOUT_MS)
+
   if (!res.ok) {
     const detail = await extractErrorMessage(res, `Failed to send audio: ${res.status}`)
     throw new Error(detail)
   }
-  return res.json()
+
+  // Parse SSE stream
+  return parseAudioSSE(res, onTranscript)
+}
+
+/**
+ * Parse an SSE response from the audio endpoint.
+ *
+ * SSE format: lines of "data: {json}\n\n"
+ * Event types: "transcript", "response", "error"
+ */
+async function parseAudioSSE(
+  res: Response,
+  onTranscript?: (text: string) => void,
+): Promise<AudioStreamResult> {
+  const reader = res.body?.getReader()
+  if (!reader) {
+    throw new Error('No response body for SSE stream')
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let transcript = ''
+  let response: AgentResponse | null = null
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      // Process complete SSE events (delimited by \n\n)
+      let boundary: number
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const chunk = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+
+        for (const line of chunk.split('\n')) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data: ')) continue
+
+          const payload = trimmed.slice(6) // Remove "data: " prefix
+          let event: { type: string; [key: string]: unknown }
+          try {
+            event = JSON.parse(payload)
+          } catch {
+            console.warn('[Caduceus] Failed to parse SSE event:', payload.slice(0, 100))
+            continue
+          }
+
+          switch (event.type) {
+            case 'transcript': {
+              transcript = event.text as string
+              onTranscript?.(transcript)
+              break
+            }
+            case 'response': {
+              response = event.data as AgentResponse
+              break
+            }
+            case 'error': {
+              throw new Error(event.message as string)
+            }
+            default: {
+              console.warn('[Caduceus] Unknown SSE event type:', event.type)
+            }
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  if (!transcript) {
+    throw new Error('No transcript received in SSE stream')
+  }
+  if (!response) {
+    throw new Error('No agent response received in SSE stream')
+  }
+
+  return { transcript, response }
 }
