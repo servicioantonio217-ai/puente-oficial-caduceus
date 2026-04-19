@@ -45,11 +45,15 @@ export function normalizeChatLines(
     // Split content on newlines - each segment becomes its own ChatLine
     const segments = normalizedContent.split('\n')
 
-    for (const segment of segments) {
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i]
       if (msg.role === 'user') {
         lines.push({ type: 'prompt', text: segment })
       } else if (msg.role === 'assistant') {
-        lines.push({ type: 'tool', text: segment })
+        // Only the FIRST line of an assistant response gets the '>>' prefix.
+        // Subsequent lines (continuation, empty lines, list items) render
+        // without prefix for a cleaner, more readable display.
+        lines.push({ type: i === 0 ? 'tool' : 'text', text: segment })
       } else {
         lines.push({ type: 'system', text: segment })
       }

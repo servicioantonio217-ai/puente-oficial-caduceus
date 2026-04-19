@@ -7,6 +7,10 @@ import { normalizeChatLines } from '../glass/normalize-chat-lines'
  * even-toolkit's formatChatLine() does word-wrapping at spaces but does NOT
  * handle \n characters. This helper splits messages on newlines before
  * passing to the display system, ensuring correct scroll calculations.
+ *
+ * IMPORTANT: Only the FIRST line of an assistant response gets the '>>' prefix
+ * (type: 'tool'). Subsequent lines (continuation, empty lines, list items)
+ * render without prefix (type: 'text') for a cleaner, more readable display.
  */
 
 describe('normalizeChatLines', () => {
@@ -34,7 +38,7 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'Line one' },
-      { type: 'tool', text: 'Line two' },
+      { type: 'text', text: 'Line two' },
     ])
   })
 
@@ -45,8 +49,8 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'Paragraph one' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: 'Paragraph two' },
+      { type: 'text', text: '' },
+      { type: 'text', text: 'Paragraph two' },
     ])
   })
 
@@ -57,10 +61,10 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'Start' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: 'End' },
+      { type: 'text', text: '' },
+      { type: 'text', text: '' },
+      { type: 'text', text: '' },
+      { type: 'text', text: 'End' },
     ])
   })
 
@@ -71,7 +75,7 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'Text' },
-      { type: 'tool', text: '' },
+      { type: 'text', text: '' },
     ])
   })
 
@@ -82,7 +86,7 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: '' },
-      { type: 'tool', text: 'Text' },
+      { type: 'text', text: 'Text' },
     ])
   })
 
@@ -96,8 +100,8 @@ describe('normalizeChatLines', () => {
       { type: 'prompt', text: 'Question one' },
       { type: 'prompt', text: 'Question two' },
       { type: 'tool', text: 'Answer' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: 'With details' },
+      { type: 'text', text: '' },
+      { type: 'text', text: 'With details' },
     ])
   })
 
@@ -168,11 +172,11 @@ describe('normalizeChatLines', () => {
 
     expect(result).toEqual([
       { type: 'tool', text: 'Here are the options:' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: '1. Option A' },
-      { type: 'tool', text: '2. Option B' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: 'Choose wisely.' },
+      { type: 'text', text: '' },
+      { type: 'text', text: '1. Option A' },
+      { type: 'text', text: '2. Option B' },
+      { type: 'text', text: '' },
+      { type: 'text', text: 'Choose wisely.' },
     ])
     expect(result.length).toBe(6)
   })
@@ -188,7 +192,7 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'Line one' },
-      { type: 'tool', text: 'Line two' },
+      { type: 'text', text: 'Line two' },
     ])
   })
 
@@ -199,7 +203,7 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'Line one' },
-      { type: 'tool', text: 'Line two' },
+      { type: 'text', text: 'Line two' },
     ])
   })
 
@@ -210,9 +214,9 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'A' },
-      { type: 'tool', text: 'B' },
-      { type: 'tool', text: 'C' },
-      { type: 'tool', text: 'D' },
+      { type: 'text', text: 'B' },
+      { type: 'text', text: 'C' },
+      { type: 'text', text: 'D' },
     ])
   })
 
@@ -223,8 +227,8 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'tool', text: 'Para one' },
-      { type: 'tool', text: '' },
-      { type: 'tool', text: 'Para two' },
+      { type: 'text', text: '' },
+      { type: 'text', text: 'Para two' },
     ])
   })
 
@@ -259,6 +263,25 @@ describe('normalizeChatLines', () => {
     const result = normalizeChatLines(messages)
     expect(result).toEqual([
       { type: 'prompt', text: '' },
+    ])
+  })
+
+  // ============================================================
+  // Multiple assistant messages - each gets its own '>>' prefix
+  // ============================================================
+
+  it('each assistant message starts with tool type (separate messages)', () => {
+    const messages = [
+      { role: 'assistant', content: 'First response' },
+      { role: 'user', content: 'Follow-up' },
+      { role: 'assistant', content: 'Second response\nwith two lines' },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'tool', text: 'First response' },
+      { type: 'prompt', text: 'Follow-up' },
+      { type: 'tool', text: 'Second response' },
+      { type: 'text', text: 'with two lines' },
     ])
   })
 })
