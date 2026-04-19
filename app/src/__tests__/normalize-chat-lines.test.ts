@@ -176,4 +176,89 @@ describe('normalizeChatLines', () => {
     ])
     expect(result.length).toBe(6)
   })
+
+  // ============================================================
+  // Newline normalization tests (CRLF, CR handling)
+  // ============================================================
+
+  it('normalizes Windows CRLF (\\r\\n) to LF', () => {
+    const messages = [
+      { role: 'assistant', content: 'Line one\r\nLine two' },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'tool', text: 'Line one' },
+      { type: 'tool', text: 'Line two' },
+    ])
+  })
+
+  it('normalizes legacy Mac CR (\\r) to LF', () => {
+    const messages = [
+      { role: 'assistant', content: 'Line one\rLine two' },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'tool', text: 'Line one' },
+      { type: 'tool', text: 'Line two' },
+    ])
+  })
+
+  it('handles mixed newlines (CRLF, LF, CR)', () => {
+    const messages = [
+      { role: 'assistant', content: 'A\r\nB\nC\rD' },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'tool', text: 'A' },
+      { type: 'tool', text: 'B' },
+      { type: 'tool', text: 'C' },
+      { type: 'tool', text: 'D' },
+    ])
+  })
+
+  it('handles CRLF with double newlines (paragraph separators)', () => {
+    const messages = [
+      { role: 'assistant', content: 'Para one\r\n\r\nPara two' },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'tool', text: 'Para one' },
+      { type: 'tool', text: '' },
+      { type: 'tool', text: 'Para two' },
+    ])
+  })
+
+  // ============================================================
+  // Runtime safety tests (null/undefined content)
+  // ============================================================
+
+  it('handles null content gracefully', () => {
+    const messages = [
+      { role: 'user', content: null as unknown as string },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'prompt', text: '' },
+    ])
+  })
+
+  it('handles undefined content gracefully', () => {
+    const messages = [
+      { role: 'assistant', content: undefined as unknown as string },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'tool', text: '' },
+    ])
+  })
+
+  it('handles empty string content', () => {
+    const messages = [
+      { role: 'user', content: '' },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result).toEqual([
+      { type: 'prompt', text: '' },
+    ])
+  })
 })
