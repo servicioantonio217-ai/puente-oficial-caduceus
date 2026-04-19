@@ -193,7 +193,7 @@ describe('api', () => {
         ]),
       )
 
-      const result = await api.sendAudio(config, 'abc', new Blob(), 300_000, transcriptCallback)
+      const _result = await api.sendAudio(config, 'abc', new Blob(), 300_000, transcriptCallback)
       callOrder.push('resolved')
 
       expect(callOrder).toEqual(['transcript', 'resolved'])

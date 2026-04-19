@@ -5,7 +5,6 @@ import {
   loadAgentTimeoutSettings, saveAgentTimeoutSettingsToBridge,
   DEFAULT_RECORDING_SETTINGS,
   DEFAULT_AGENT_TIMEOUT_SETTINGS,
-  MIN_AGENT_TIMEOUT_SEC,
 } from '../storage'
 import type { BridgeConfig, RecordingSettings, AgentTimeoutSettings } from '../types'
 
