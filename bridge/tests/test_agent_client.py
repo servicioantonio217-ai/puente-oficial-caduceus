@@ -103,7 +103,11 @@ class TestParseResponse:
 
     def test_client_custom_timeout(self):
         """Verify a custom G2_AGENT_TIMEOUT value is passed through to httpx."""
-        settings = Settings(agent_api_key="test", agent_api_url="http://localhost:9999/v1", agent_timeout=600.0)
+        settings = Settings(
+            agent_api_key="test",
+            agent_api_url="http://localhost:9999/v1",
+            agent_timeout=600.0,
+        )
         client = AgentClient(settings)
         assert client._client.timeout.read == 600.0
         assert client._client.timeout.connect == 10.0
