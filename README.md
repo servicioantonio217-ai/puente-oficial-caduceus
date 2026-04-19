@@ -31,23 +31,102 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design document.
 
 ## Quick Start
 
+Choose your deployment method:
+
+- **[Container](#container-deployment-recommended)** — Fastest way to get running, no Python/Node setup needed
+- **[Local install](#local-installation)** — For development or customized deployments
+
 ### Prerequisites
 
 - Even Realities G2 smart glasses
 - Android or iOS phone with the [Even Realities App](https://evenrealities.com)
-- A running AI agent with an OpenAI Responses API compatible endpoint (e.g., [Hermes Agent](https://hermes-agent.nousresearch.com))
+- A running AI agent with an OpenAI Chat Completions API compatible endpoint (e.g., [Hermes Agent](https://hermes-agent.nousresearch.com))
 - A running STT endpoint (e.g., OpenAI `/v1/audio/transcriptions`, local Whisper) — optional, for voice input
-- Python ≥ 3.11 (bridge)
-- Node.js ≥ 18 (app)
+- [Podman](https://podman.io) or Docker — for container deployment
+- Python ≥ 3.11 and Node.js ≥ 18 — only for local install
 
-### 1. Clone
+---
+
+### Container Deployment (Recommended)
+
+#### 1. Clone
 
 ```bash
-git clone https://github.com/your-org/g2-caduceus.git
+git clone https://gitlab.com/Qu4ndo/g2-caduceus.git
 cd g2-caduceus
 ```
 
-### 2. Set up the Bridge Server
+> **Note:** Replace the clone URL with your own fork or mirror if applicable. <!-- PLACEHOLDER: Update clone URL to your public repo -->
+
+#### 2. Configure
+
+Create a `.env` file in the project root:
+
+```bash
+# Required
+G2_BRIDGE_TOKEN=<your-client-token>
+G2_AGENT_API_KEY=<your-agent-api-key>
+G2_AGENT_API_URL=http://host.containers.internal:<agent-port>/v1
+
+# Optional — for voice input
+G2_STT_API_URL=http://host.containers.internal:<stt-port>/v1/audio/transcriptions
+G2_STT_API_KEY=<your-stt-api-key>
+G2_STT_MODEL=whisper-1
+```
+
+> **Tip:** Use `host.containers.internal` instead of `localhost` to reach services on the host from within the container.
+
+#### 3. Run the Bridge
+
+**Option A: Podman Compose**
+
+```bash
+cp bridge/docker-compose.example.yml docker-compose.yml
+# Edit docker-compose.yml with your values if not using .env
+podman compose up -d
+```
+
+**Option B: Manual container run**
+
+```bash
+podman build -t g2-bridge ./bridge
+podman run -d \
+  --name g2-bridge \
+  -p 8643:8643 \
+  -e G2_BRIDGE_TOKEN=<your-client-token> \
+  -e G2_AGENT_API_KEY=<your-agent-api-key> \
+  -e G2_AGENT_API_URL=http://host.containers.internal:<agent-port>/v1 \
+  -v g2-data:/data \
+  g2-bridge
+```
+
+#### 4. Verify
+
+```bash
+curl http://localhost:8643/health
+# Expected: {"status":"ok","version":"0.1.0"}
+```
+
+**Container notes:**
+- The bridge listens on port **8643** by default
+- SQLite data is stored at `/data/g2_bridge.db` inside the container — mount a volume for persistence
+- The container runs as a non-root user (`appuser`)
+- For accessing host services, use `host.containers.internal` (Podman) or `host.docker.internal` (Docker)
+
+See [bridge/README.md](bridge/README.md) for all configuration options and API reference.
+
+---
+
+### Local Installation
+
+#### 1. Clone
+
+```bash
+git clone https://gitlab.com/Qu4ndo/g2-caduceus.git
+cd g2-caduceus
+```
+
+#### 2. Set up the Bridge Server
 
 ```bash
 cd bridge
@@ -68,7 +147,7 @@ For voice input, add STT configuration:
 ```bash
 G2_STT_API_URL=http://<stt-host>:<stt-port>/v1/audio/transcriptions \
 G2_STT_API_KEY=*** \
-G2_STT_MODEL=<model-name> \
+G2_STT_MODEL=<model-name>
 ```
 
 Verify the bridge is running:
@@ -79,7 +158,7 @@ curl http://localhost:<bridge-port>/health
 
 See [bridge/README.md](bridge/README.md) for all configuration options, API reference, and Podman deployment.
 
-### 3. Set up the Phone App
+#### 3. Set up the Phone App
 
 ```bash
 cd app
@@ -101,7 +180,9 @@ Configure the bridge connection in the app's Settings screen:
 
 See [app/README.md](app/README.md) for build, packaging, and troubleshooting details.
 
-### 4. Verify End-to-End
+---
+
+### Verify End-to-End
 
 1. Open the app on your phone
 2. Enter bridge URL and token in Settings
@@ -119,14 +200,15 @@ g2-caduceus/
 │   ├── src/g2_bridge/         #   Bridge source code
 │   ├── tests/                 #   Test suite
 │   ├── Dockerfile             #   Container build
-│   └── README.md              #   Setup, config reference, API docs
+│   ├── docker-compose.example.yml  # Compose example
+│   └── README.md              # Setup, config reference, API docs
 ├── app/                       # Even Hub App (TypeScript/React)
 │   ├── src/                   #   App source code
 │   │   ├── glass/             #     Glasses display layer
 │   │   ├── screens/           #     Phone WebUI screens
 │   │   ├── audio/             #     Audio capture + VAD
 │   │   └── contexts/          #     App state management
-│   └── README.md              #   Setup, sideload, packaging docs
+│   └── README.md              # Setup, sideload, packaging docs
 └── docs/                      # Documentation
     ├── ARCHITECTURE.md        #   3-tier architecture deep-dive
     ├── CONTRIBUTING.md        #   Dev setup, code style, PR process
@@ -183,7 +265,7 @@ npx @evenrealities/evenhub-simulator@latest http://localhost:5173
 
 ## Tested AI Agents
 
-G2 Caduceus works with any AI agent that implements the OpenAI Responses API. Tested with:
+G2 Caduceus works with any AI agent that implements the OpenAI Chat Completions API. Tested with:
 
 - [Hermes Agent](https://hermes-agent.nousresearch.com) — Nous Research's AI assistant
 - Any OpenAI-compatible Chat Completions API endpoint
