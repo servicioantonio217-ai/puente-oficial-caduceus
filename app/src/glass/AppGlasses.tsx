@@ -52,8 +52,6 @@ export function AppGlasses() {
   // When new messages arrive between actions (via polling), the chat
   // display resets to the bottom so the latest content is always visible.
   const lastActionLineCountRef = useRef(chatLines.length)
-  // Keep ref in sync with current line count (for snapshot construction)
-  lastActionLineCountRef.current = chatLines.length
 
   const snapshot: AppSnapshot = {
     screen: deriveScreenName(),
