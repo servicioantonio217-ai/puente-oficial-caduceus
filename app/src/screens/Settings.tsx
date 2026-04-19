@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { SettingsGroup, ListItem, Input, Button, Toggle } from 'even-toolkit/web'
 import { useApp } from '../contexts/AppContext'
-import type { BridgeConfig, RecordingSettings } from '../types'
+import type { BridgeConfig, RecordingSettings, AgentTimeoutSettings } from '../types'
+import { MIN_AGENT_TIMEOUT_SEC } from '../storage'
 
 /** Clamp a value to [min, max]. */
 function clamp(value: number, min: number, max: number): number {
@@ -14,6 +15,8 @@ export function Settings() {
   const {
     config, setConfig, connected, connect, disconnect,
     recordingSettings, setRecordingSettings,
+    agentTimeoutSettings, setAgentTimeoutSettings,
+    agentTimeoutMs,
   } = useApp()
   const [url, setUrl] = useState(config.url)
   const [token, setToken] = useState(config.token)
@@ -22,6 +25,14 @@ export function Settings() {
   // Local editing state for silence timeout (seconds, user-friendly)
   const [timeoutInput, setTimeoutInput] = useState(
     String(recordingSettings.silenceTimeoutMs / 1000),
+  )
+
+  // Local editing state for agent timeout (seconds, user-friendly)
+  // 0 means "use bridge default" — displayed as empty or "Auto"
+  const [agentTimeoutInput, setAgentTimeoutInput] = useState(
+    agentTimeoutSettings.agentTimeoutSec > 0
+      ? String(agentTimeoutSettings.agentTimeoutSec)
+      : '',
   )
 
   const handleSave = () => {
@@ -57,6 +68,27 @@ export function Settings() {
     // Sync input to the clamped value
     setTimeoutInput(String(ms / 1000))
   }
+
+  /** Commit the agent timeout value from the text input. */
+  const handleAgentTimeoutCommit = () => {
+    const trimmed = agentTimeoutInput.trim()
+    if (!trimmed) {
+      // Empty = use bridge default
+      const updated: AgentTimeoutSettings = { agentTimeoutSec: 0 }
+      setAgentTimeoutSettings(updated)
+      return
+    }
+    const seconds = parseInt(trimmed, 10)
+    if (isNaN(seconds)) return
+    const clamped = Math.max(MIN_AGENT_TIMEOUT_SEC, seconds)
+    const updated: AgentTimeoutSettings = { agentTimeoutSec: clamped }
+    setAgentTimeoutSettings(updated)
+    // Sync input to the clamped value
+    setAgentTimeoutInput(String(clamped))
+  }
+
+  /** Effective timeout displayed to the user (in seconds). */
+  const effectiveTimeoutSec = Math.round(agentTimeoutMs / 1000)
 
   return (
     <main className="px-3 pt-4 pb-8 space-y-6">
@@ -101,6 +133,38 @@ export function Settings() {
               </p>
             </div>
           )}
+        </div>
+      </SettingsGroup>
+
+      {/* Agent Timeout Settings */}
+      <SettingsGroup label="Agent">
+        <div className="px-4 py-3 space-y-4">
+          <div className="space-y-1.5">
+            <span className="text-[13px] tracking-[-0.13px] text-text-dim">
+              Agent timeout (seconds)
+            </span>
+            <Input
+              type="number"
+              min={String(MIN_AGENT_TIMEOUT_SEC)}
+              value={agentTimeoutInput}
+              onChange={(e) => setAgentTimeoutInput(e.target.value)}
+              onBlur={handleAgentTimeoutCommit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAgentTimeoutCommit()
+              }}
+              placeholder="Auto (use bridge default)"
+            />
+            <p className="text-[11px] tracking-[-0.11px] text-text-muted">
+              {agentTimeoutSettings.agentTimeoutSec > 0
+                ? `Custom: ${effectiveTimeoutSec}s (min ${MIN_AGENT_TIMEOUT_SEC}s)`
+                : connected
+                  ? `Auto: using bridge value (${effectiveTimeoutSec}s)`
+                  : `Auto: defaults to ${effectiveTimeoutSec}s when connected`}
+            </p>
+            <p className="text-[11px] tracking-[-0.11px] text-text-muted">
+              Leave empty to use the bridge's configured timeout. Set a value to override.
+            </p>
+          </div>
         </div>
       </SettingsGroup>
 
