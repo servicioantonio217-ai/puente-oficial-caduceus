@@ -5,6 +5,7 @@ import { toDisplayData, onGlassAction, type AppSnapshot } from './selectors'
 import type { AppActions, ScreenName } from './shared'
 import { useApp } from '../contexts/AppContext'
 import { MAX_GLASS_SESSIONS } from './ui-helpers'
+import { normalizeChatLines } from './normalize-chat-lines'
 
 /**
  * Glasses bridge component.
@@ -37,25 +38,15 @@ export function AppGlasses() {
     [sessions],
   )
 
-  // Build chat lines — pure content only, no status indicators.
-  // Status (recording/processing) lives in the header & action bar, not in chat content.
+  // Build chat lines — split on newlines for correct scroll calculation.
+  // even-toolkit's formatChatLine() does word-wrapping but ignores \n.
+  // Splitting ensures each paragraph is processed independently and
+  // buildMessageScrollTargets() sees the correct total line count.
   // Prefix convention: > = user message (prompt), >> = assistant message (tool).
-  // This creates a symmetric visual pattern on the G2 display for easy distinction.
-  const chatLines = useMemo(() => {
-    const lines: Array<{ type: 'prompt' | 'tool' | 'system' | 'error'; text: string }> = messages.map((msg) => {
-      if (msg.role === 'user') return { type: 'prompt' as const, text: msg.content }
-      // 'tool' type renders with >> prefix in even-toolkit — visually distinct from > (user)
-      if (msg.role === 'assistant') return { type: 'tool' as const, text: msg.content }
-      return { type: 'system' as const, text: msg.content }
-    })
-    // Show error as error line when idle (not recording, not processing)
-    if (error && !isLoading && !isRecording) {
-      // Truncate long errors to fit G2 display (~44 chars/line)
-      const truncated = error.length > 40 ? error.slice(0, 37) + '...' : error
-      lines.push({ type: 'error' as const, text: truncated })
-    }
-    return lines
-  }, [messages, error, isLoading, isRecording])
+  const chatLines = useMemo(
+    () => normalizeChatLines(messages, error, isLoading, isRecording),
+    [messages, error, isLoading, isRecording],
+  )
 
   // Track message count at last glass action for auto-scroll detection.
   // When new messages arrive between actions (via polling), the chat
