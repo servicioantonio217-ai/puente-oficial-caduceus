@@ -358,22 +358,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return
           }
 
-          const result = await api.sendAudio(configRef.current, session.id, blob)
-
-          // Phase 1: Show transcript (user message) immediately so the user
-          // can verify what was transcribed while the response renders.
-          const userMsg: ChatMessage = {
-            id: uuid(),
-            role: 'user',
-            content: result.transcript,
-            created_at: new Date().toISOString(),
-          }
-          setMessages((prev) => [...prev, userMsg])
-
-          // Brief pause to force two separate renders — transcript first,
-          // then response. Without this, React batches both setMessages
-          // calls and the user sees Q&A appear simultaneously (#34).
-          await new Promise(resolve => setTimeout(resolve, 150))
+          // SSE streaming: transcript arrives first (~1.4s after STT),
+          // then the agent response. The onTranscript callback shows
+          // the user's speech immediately before "Thinking" continues.
+          const result = await api.sendAudio(
+            configRef.current,
+            session.id,
+            blob,
+            (transcript: string) => {
+              // Phase 1: Show transcript immediately — the user sees
+              // what was understood while the agent is still thinking.
+              const userMsg: ChatMessage = {
+                id: uuid(),
+                role: 'user',
+                content: transcript,
+                created_at: new Date().toISOString(),
+              }
+              setMessages((prev) => [...prev, userMsg])
+            },
+          )
 
           // Phase 2: Show assistant response
           const assistantText = extractAssistantText(result.response)
