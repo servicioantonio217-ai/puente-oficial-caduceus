@@ -95,6 +95,23 @@ class TestParseResponse:
         expected = f"Bearer {self.settings.agent_api_key}"
         assert self.client._client.headers["Authorization"] == expected
 
+    def test_client_uses_configured_timeout(self):
+        """Verify the client uses the configured agent_timeout, not a hardcoded value."""
+        # Default Settings has agent_timeout=300.0
+        assert self.client._client.timeout.read == 300.0
+        assert self.client._client.timeout.connect == 10.0
+
+    def test_client_custom_timeout(self):
+        """Verify a custom G2_AGENT_TIMEOUT value is passed through to httpx."""
+        settings = Settings(
+            agent_api_key="test",
+            agent_api_url="http://localhost:9999/v1",
+            agent_timeout=600.0,
+        )
+        client = AgentClient(settings)
+        assert client._client.timeout.read == 600.0
+        assert client._client.timeout.connect == 10.0
+
 
 class TestSendMessageWithInstructions:
     @pytest.mark.asyncio
