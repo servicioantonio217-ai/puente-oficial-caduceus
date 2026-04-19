@@ -24,7 +24,7 @@ class AgentClient:
                 "Authorization": f"Bearer {settings.agent_api_key}",
                 "Content-Type": "application/json",
             },
-            timeout=httpx.Timeout(120.0, connect=10.0),
+            timeout=httpx.Timeout(settings.agent_timeout, connect=10.0),
         )
 
     async def close(self) -> None:

@@ -52,6 +52,7 @@ class Settings(BaseSettings):
 
     # AI Agent behavior
     agent_instructions: str = ""  # G2_AGENT_INSTRUCTIONS — optional system prompt for the agent
+    agent_timeout: float = 300.0  # G2_AGENT_TIMEOUT — seconds to wait for agent response (was hardcoded 120s)
 
     # Response adaptation
     max_response_chars: int = 500  # G2_MAX_RESPONSE_CHARS

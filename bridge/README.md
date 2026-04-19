@@ -128,6 +128,7 @@ All settings use environment variables with the `G2_` prefix. They can also be s
 | `G2_MAX_AUDIO_BYTES` | `5242880` (5 MB) | Maximum audio file size accepted by the audio endpoint. Larger files return 413. |
 | `G2_MAX_CONTEXT_MESSAGES` | `50` | Maximum number of prior messages sent to the agent as conversation context. Prevents token overflow. |
 | `G2_AGENT_INSTRUCTIONS` | *(empty)* | Optional system prompt injected as the first message in every agent request. Use this to customize agent behavior (e.g., "Keep responses short and factual."). |
+| `G2_AGENT_TIMEOUT` | `300` | Timeout in seconds for AI agent responses. Complex tasks with tool calls can take 2-5 minutes; the previous hardcoded 120s caused 504 errors on long-running requests. |
 | `G2_TIMEZONE` | `UTC` | IANA timezone for timestamp display (e.g., `Europe/Vienna`). All timestamps are stored as UTC and converted on output. Invalid values cause startup failure. |
 | `G2_HOST` | `0.0.0.0` | Server listen host. Part of the Python `Settings` model — read from env var by `main.py` and passed to uvicorn. |
 | `G2_PORT` | `8643` | Server listen port. Same as `G2_HOST` — read from env var by `main.py` and passed to uvicorn. |
@@ -362,7 +363,7 @@ Common error codes:
 - `404` — Session not found
 - `502` — Agent/STT service unreachable or returned an error
 - `503` — Agent API key not configured, or STT not configured (for audio)
-- `504` — Agent service timed out (120s for agent, 30s for STT)
+- `504` — Agent service timed out (configurable via `G2_AGENT_TIMEOUT`, default 300s; 30s for STT)
 
 ## Response Adaptation
 
