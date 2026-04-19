@@ -33,7 +33,7 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _sse_event(event_type: str, data: dict) -> str:
+def _sse_event(event_type: str, data: dict[str, object]) -> str:
     """Format a Server-Sent Event."""
     payload = {"type": event_type, **data}
     return f"data: {json.dumps(payload)}\n\n"

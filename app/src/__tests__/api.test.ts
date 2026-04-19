@@ -167,7 +167,7 @@ describe('api', () => {
         ]),
       )
 
-      const result = await api.sendAudio(config, 'abc', new Blob(), transcriptCallback)
+      await api.sendAudio(config, 'abc', new Blob(), transcriptCallback)
       callOrder.push('resolved')
 
       expect(callOrder).toEqual(['transcript', 'resolved'])
@@ -221,12 +221,6 @@ describe('api', () => {
 
     it('handles SSE events split across chunks', async () => {
       const transcriptCallback = vi.fn()
-      const agentResponse = {
-        id: 'resp-4',
-        status: 'completed',
-        conversation: 'abc',
-        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Yes' }] }],
-      }
 
       // Split the SSE data into two chunks to test partial buffering
       const chunk1 = 'data: {"type":"transcript","text":"hello"}\n\n'
@@ -252,12 +246,6 @@ describe('api', () => {
 
     it('skips malformed SSE lines gracefully', async () => {
       const transcriptCallback = vi.fn()
-      const agentResponse = {
-        id: 'resp-5',
-        status: 'completed',
-        conversation: 'abc',
-        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Ok' }] }],
-      }
 
       const sseBody =
         'data: {"type":"transcript","text":"hi"}\n\n' +
