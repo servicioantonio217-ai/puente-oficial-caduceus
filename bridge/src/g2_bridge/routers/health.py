@@ -13,9 +13,15 @@ router = APIRouter(tags=["health"])
 async def health_check(request: Request) -> HealthResponse:
     """Basic health check — always returns 200 if the server is running.
 
-    Exposes the bridge's agent_timeout so the app can align its
+    Exposes the bridge's agent_timeout so that the app can align its
     request timeout with the server-side wait duration, preventing
     the app from aborting before the bridge finishes processing.
+
+    Exposes streaming_enabled so the app can detect streaming support
+    and use streaming endpoints when available.
     """
     settings = request.app.state.settings
-    return HealthResponse(agent_timeout=settings.agent_timeout)
+    return HealthResponse(
+        agent_timeout=settings.agent_timeout,
+        streaming_enabled=settings.stream_enabled,
+    )

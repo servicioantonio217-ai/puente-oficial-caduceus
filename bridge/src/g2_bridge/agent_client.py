@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
@@ -114,3 +115,74 @@ class AgentClient:
             output=messages,
             usage=raw.get("usage", {}),
         )
+
+    async def send_message_stream(
+        self,
+        content: str,
+        history: list[dict[str, str]] | None = None,
+    ) -> AsyncIterator[str]:
+        """Send a message to the AI Agent and stream the response via SSE.
+
+        Uses the OpenAI Chat Completions API format with stream: true.
+        Yields SSE-formatted data lines for each chunk.
+
+        Args:
+            content: The current user message.
+            history: Prior messages as [{"role": "user"|"assistant", "content": "..."}].
+
+        Yields:
+            SSE-formatted strings like "data: {\"delta\": {\"content\": \"...\"}}\\n\\n"
+        """
+        messages: list[dict[str, str]] = []
+        if self.settings.agent_instructions:
+            messages.append({"role": "system", "content": self.settings.agent_instructions})
+
+        # Include conversation history (prior turns)
+        if history:
+            messages.extend(history)
+
+        # Current user message
+        messages.append({"role": "user", "content": content})
+
+        payload: dict[str, Any] = {
+            "model": "default",
+            "messages": messages,
+            "stream": True,
+        }
+
+        logger.debug(
+            "Sending streaming request to agent: %d history messages + 1 current",
+            len(history) if history else 0,
+            extra={
+                "extra_fields": {
+                    "history_count": str(len(history) if history else 0),
+                    "total_messages": str(len(messages)),
+                }
+            },
+        )
+
+        async with self._client.stream(
+            "POST",
+            "/chat/completions",
+            json=payload,
+            timeout=httpx.Timeout(self.settings.agent_timeout, connect=10.0),
+        ) as response:
+            if response.status_code != 200:
+                logger.error(
+                    "Agent streaming returned %d: %s",
+                    response.status_code,
+                    await response.aread()[:200],
+                    extra={
+                        "extra_fields": {
+                            "status_code": str(response.status_code),
+                        }
+                    },
+                )
+                response.raise_for_status()
+
+            async for line in response.aiter_lines():
+                if line.startswith("data: "):
+                    data_str = line[6:]  # Remove "data: " prefix
+                    if data_str.strip() == "[DONE]":
+                        break
+                    yield f"data: {data_str}\n\n"
