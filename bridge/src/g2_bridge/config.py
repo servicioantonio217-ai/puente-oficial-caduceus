@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     agent_instructions: str = ""  # G2_AGENT_INSTRUCTIONS — optional system prompt for the agent
     agent_timeout: float = 300.0  # G2_AGENT_TIMEOUT — seconds for agent response
 
+    # Streaming
+    stream_enabled: bool = False  # G2_STREAM_ENABLED — enable SSE streaming for agent responses
+
     # Response adaptation
     max_response_chars: int = 500  # G2_MAX_RESPONSE_CHARS
     max_audio_bytes: int = 5 * 1024 * 1024  # G2_MAX_AUDIO_BYTES — 5 MB limit

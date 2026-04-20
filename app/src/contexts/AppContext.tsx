@@ -330,38 +330,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setMessages((prev) => [...prev, userMsg])
 
+    // Create empty assistant message for streaming updates
+    const assistantMsgId = uuid()
+    const assistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+    }
+    setMessages((prev) => [...prev, assistantMsg])
+
     try {
-      const response: AgentResponse = await api.sendMessage(
-        configRef.current,
-        currentSession.id,
-        content,
-        agentTimeoutMsRef.current,
-      )
+      // Use streaming if enabled by bridge
+      const health = await api.healthCheck(configRef.current)
+      if (health.streamingEnabled) {
+        // Streaming mode: incrementally update assistant message
+        let fullText = ''
+        const response = await api.sendMessageStream(
+          configRef.current,
+          currentSession.id,
+          content,
+          agentTimeoutMsRef.current,
+          (token) => {
+            // Update assistant message incrementally
+            fullText += token
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsgId ? { ...m, content: fullText } : m
+              )
+            )
+          },
+        )
 
-      // Extract assistant text from response with fallbacks
-      const assistantText = extractAssistantText(response)
+        // Final update with complete response
+        const assistantText = extractAssistantText(response)
+        if (assistantText) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId ? { ...m, content: assistantText } : m
+            )
+          )
+        }
+      } else {
+        // Non-streaming mode: wait for full response
+        const response = await api.sendMessage(
+          configRef.current,
+          currentSession.id,
+          content,
+          agentTimeoutMsRef.current,
+        )
 
-      if (!assistantText) {
-        setError('Received empty response from agent')
-        // Remove optimistic user message — no point keeping it without a reply
-        setMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
-        return
+        // Extract assistant text from response with fallbacks
+        const assistantText = extractAssistantText(response)
+
+        if (!assistantText) {
+          setError('Received empty response from agent')
+          // Remove both messages
+          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsgId))
+          return
+        }
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, content: assistantText } : m
+          )
+        )
       }
-
-      const assistantMsg: ChatMessage = {
-        id: response.id ?? uuid(),
-        role: 'assistant',
-        content: assistantText,
-        created_at: new Date().toISOString(),
-      }
-      setMessages((prev) => [...prev, assistantMsg])
 
       // Refresh session list to update message_count
       refreshSessions()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to send message')
-      // Remove optimistic user message on failure
-      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
+      // Remove both messages on failure
+      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsgId))
     } finally {
       setIsLoading(false)
     }
@@ -407,41 +448,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
 
           // SSE streaming: transcript arrives first (~1.4s after STT),
-          // then the agent response. The onTranscript callback shows
-          // the user's speech immediately before "Thinking" continues.
+          // then agent response tokens. The onTranscript callback handles
+          // both transcript and streaming tokens.
+          let userMsgId: string | null = null
+          let assistantMsgId: string | null = null
+          let fullAssistantText = ''
+
           const result = await api.sendAudio(
             configRef.current,
             session.id,
             blob,
             agentTimeoutMsRef.current,
-            (transcript: string) => {
-              // Phase 1: Show transcript immediately — the user sees
-              // what was understood while the agent is still thinking.
-              const userMsg: ChatMessage = {
-                id: uuid(),
-                role: 'user',
-                content: transcript,
-                created_at: new Date().toISOString(),
+            (text: string) => {
+              // Detect if this is a transcript or a streaming token
+              // Transcript is typically shorter and comes first
+              if (!userMsgId) {
+                // Phase 1: First text received = transcript
+                userMsgId = uuid()
+                const userMsg: ChatMessage = {
+                  id: userMsgId,
+                  role: 'user',
+                  content: text,
+                  created_at: new Date().toISOString(),
+                }
+                setMessages((prev) => [...prev, userMsg])
+              } else {
+                // Phase 2: Subsequent text = streaming tokens
+                if (!assistantMsgId) {
+                  // Create assistant message on first token
+                  assistantMsgId = uuid()
+                  const assistantMsg: ChatMessage = {
+                    id: assistantMsgId,
+                    role: 'assistant',
+                    content: '',
+                    created_at: new Date().toISOString(),
+                  }
+                  setMessages((prev) => [...prev, assistantMsg])
+                }
+                // Incrementally update assistant message
+                fullAssistantText += text
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId ? { ...m, content: fullAssistantText } : m
+                  )
+                )
               }
-              setMessages((prev) => [...prev, userMsg])
             },
           )
 
-          // Phase 2: Show assistant response
+          // Phase 2: Finalize assistant response
           const assistantText = extractAssistantText(result.response)
 
           if (!assistantText) {
             setError('Received empty response from agent')
+            // Remove user message if it was added
+            if (userMsgId) {
+              setMessages((prev) => prev.filter((m) => m.id !== userMsgId))
+            }
             return
           }
 
-          const assistantMsg: ChatMessage = {
-            id: result.response.id ?? uuid(),
-            role: 'assistant',
-            content: assistantText,
-            created_at: new Date().toISOString(),
+          // Update or create assistant message with final response
+          if (assistantMsgId) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsgId ? { ...m, content: assistantText } : m
+              )
+            )
+          } else {
+            // No streaming tokens - create assistant message now
+            const assistantMsg: ChatMessage = {
+              id: result.response.id ?? uuid(),
+              role: 'assistant',
+              content: assistantText,
+              created_at: new Date().toISOString(),
+            }
+            setMessages((prev) => [...prev, assistantMsg])
           }
-          setMessages((prev) => [...prev, assistantMsg])
           refreshSessions()
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Failed to process audio')
