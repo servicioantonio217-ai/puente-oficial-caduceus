@@ -112,10 +112,12 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
       ? snapshot.chatLines
       : [{ type: 'text' as const, text: '[ Tap to record ]' }]
 
-    // Auto-scroll: if new messages arrived since the last glass action,
+    // Auto-scroll: if new chat lines appeared since the last glass action,
     // reset scrollOffset to 0 (bottom) so the latest content is visible.
     // This handles the case where messages arrive via polling (not user action).
-    const hasNewMessages = msgCount > snapshot.lastActionLineCount
+    // Note: compares chatLines.length (current display lines) vs
+    // lastActionLineCount (display lines at last glass action).
+    const hasNewMessages = snapshot.chatLines.length > snapshot.lastActionLineCount
     const scrollOffset = hasNewMessages ? 0 : nav.highlightedIndex
 
     // actionBar is required by buildChatDisplay but we don't want a visible bar.

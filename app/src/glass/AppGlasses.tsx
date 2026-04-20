@@ -48,12 +48,14 @@ export function AppGlasses() {
     [messages, error, isLoading, isRecording],
   )
 
-  // Track message count at last glass action for auto-scroll detection.
+  // Track chat line count at last glass action for auto-scroll detection.
   // When new messages arrive between actions (via polling), the chat
   // display resets to the bottom so the latest content is always visible.
+  // CRITICAL: Only update this ref inside handleGlassAction — updating it
+  // every render (as the old code did) makes lastActionLineCount always
+  // equal chatLines.length, so hasNewMessages is never true and auto-scroll
+  // never triggers. See theory-A branch for this fix.
   const lastActionLineCountRef = useRef(chatLines.length)
-  // Keep ref in sync with current line count (for snapshot construction)
-  lastActionLineCountRef.current = chatLines.length
 
   const snapshot: AppSnapshot = {
     screen: deriveScreenName(),
