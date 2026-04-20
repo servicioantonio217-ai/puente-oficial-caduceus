@@ -46,19 +46,17 @@ function headers(config: BridgeConfig, json = true): Record<string, string> {
   return h
 }
 
-/** Response shape from /health endpoint. */
+/** Response shape from the /health endpoint. */
 interface HealthResponse {
   status: string
   version: string
   agent_timeout: number // seconds, reported by bridge
-  streaming_enabled: boolean
 }
 
 /** Result of a health check — connection status + bridge-reported timeout. */
 export interface HealthResult {
   ok: boolean
   agentTimeoutMs: number
-  streamingEnabled: boolean
 }
 
 /**
@@ -71,7 +69,7 @@ export interface HealthResult {
 export async function healthCheck(config: BridgeConfig): Promise<HealthResult> {
   try {
     const res = await fetchWithTimeout(`${config.url}/health`)
-    if (!res.ok) return { ok: false, agentTimeoutMs: DEFAULT_AGENT_TIMEOUT_MS, streamingEnabled: false }
+    if (!res.ok) return { ok: false, agentTimeoutMs: DEFAULT_AGENT_TIMEOUT_MS }
 
     const data: HealthResponse = await res.json()
     // Bridge reports timeout in seconds; convert to milliseconds
@@ -79,9 +77,9 @@ export async function healthCheck(config: BridgeConfig): Promise<HealthResult> {
       ? data.agent_timeout * 1000
       : DEFAULT_AGENT_TIMEOUT_MS
 
-    return { ok: true, agentTimeoutMs, streamingEnabled: data.streaming_enabled ?? false }
+    return { ok: true, agentTimeoutMs }
   } catch {
-    return { ok: false, agentTimeoutMs: DEFAULT_AGENT_TIMEOUT_MS, streamingEnabled: false }
+    return { ok: false, agentTimeoutMs: DEFAULT_AGENT_TIMEOUT_MS }
   }
 }
 
@@ -201,114 +199,6 @@ export async function sendMessage(
 }
 
 /**
- * Send a text message and stream AI response via SSE.
- *
- * SSE events:
- * - Event "token": incremental response tokens
- * - Event "response": final response object
- * - Event "error": sent on agent failure
- *
- * The `onToken` callback fires for each token chunk, allowing
- * the UI to display partial responses as they arrive.
- */
-export async function sendMessageStream(
-  config: BridgeConfig,
-  sessionId: string,
-  content: string,
-  agentTimeoutMs: number,
-  onToken?: (text: string) => void,
-): Promise<AgentResponse> {
-  const res = await fetchWithTimeout(`${config.url}/v1/sessions/${sessionId}/message/stream`, {
-    method: 'POST',
-    headers: headers(config),
-    body: JSON.stringify({ content }),
-  }, agentTimeoutMs)
-
-  if (!res.ok) {
-    const detail = await extractErrorMessage(res, `Failed to send message stream: ${res.status}`)
-    throw new Error(detail)
-  }
-
-  return parseMessageSSE(res, onToken)
-}
-
-/**
- * Parse an SSE response from message stream endpoint.
- *
- * SSE format: lines of "data: {json}\n\n"
- * Event types: "token", "response", "error"
- */
-async function parseMessageSSE(
-  res: Response,
-  onToken?: (text: string) => void,
-): Promise<AgentResponse> {
-  const reader = res.body?.getReader()
-  if (!reader) {
-    throw new Error('No response body for SSE stream')
-  }
-
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let response: AgentResponse | null = null
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-
-      // Process complete SSE events (delimited by \n\n)
-      let boundary: number
-      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-        const chunk = buffer.slice(0, boundary)
-        buffer = buffer.slice(boundary + 2)
-
-        for (const line of chunk.split('\n')) {
-          const trimmed = line.trim()
-          if (!trimmed.startsWith('data: ')) continue
-
-          const payload = trimmed.slice(6) // Remove "data: " prefix
-          let event: { type: string; [key: string]: unknown }
-          try {
-            event = JSON.parse(payload)
-          } catch {
-            console.warn('[Caduceus] Failed to parse SSE event:', payload.slice(0, 100))
-            continue
-          }
-
-          switch (event.type) {
-            case 'token': {
-              const token = event.content as string
-              onToken?.(token)
-              break
-            }
-            case 'response': {
-              response = event.data as AgentResponse
-              break
-            }
-            case 'error': {
-              throw new Error(event.message as string)
-            }
-            default: {
-              console.warn('[Caduceus] Unknown SSE event type:', event.type)
-            }
-          }
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock()
-  }
-
-  if (!response) {
-    throw new Error('No agent response received in SSE stream')
-  }
-
-  return response
-}
-
-/**
  * Result of an audio upload via SSE streaming.
  * The transcript is delivered first (via callback), the agent response follows.
  */
@@ -405,13 +295,6 @@ async function parseAudioSSE(
             case 'transcript': {
               transcript = event.text as string
               onTranscript?.(transcript)
-              break
-            }
-            case 'token': {
-              // Streaming token from agent - pass to onTranscript callback
-              // so UI can update assistant message incrementally
-              const token = event.content as string
-              onTranscript?.(token)
               break
             }
             case 'response': {
