@@ -135,4 +135,3 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     version: str = "0.1.0"
     agent_timeout: float = 300.0
-    streaming_enabled: bool = False
