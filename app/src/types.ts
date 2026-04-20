@@ -50,6 +50,12 @@ export interface AgentTimeoutSettings {
   agentTimeoutSec: number
 }
 
+/** Streaming settings (persisted in localStorage). */
+export interface StreamingSettings {
+  /** Whether streaming is enabled (for bridges that support it). */
+  enabled: boolean
+}
+
 /** App-wide state. */
 export interface AppState {
   connected: boolean
@@ -58,4 +64,6 @@ export interface AppState {
   messages: ChatMessage[]
   isLoading: boolean
   error: string | null
+  streamingSupported: boolean
+  streamingEnabled: boolean
 }
