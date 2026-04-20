@@ -50,6 +50,14 @@ export function buildMessageScrollTargets(
 
   for (const cl of chatLines) {
     const lineCount = formatChatLine(cl, maxChars).length
+    // Skip empty ChatLines (from \n\n paragraph breaks) as scroll boundaries.
+    // They still consume a display line (blank row) but should not be a swipe
+    // stop — otherwise scrolling degrades to line-by-line through separators
+    // instead of jumping message-to-message.
+    if (cl.text === '') {
+      currentLine += lineCount
+      continue
+    }
     boundaries.add(currentLine) // message start
 
     // Add pagination within long messages.
