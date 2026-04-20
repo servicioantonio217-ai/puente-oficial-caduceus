@@ -3,10 +3,15 @@ import { describe, it, expect, vi } from 'vitest'
 // Mock even-toolkit before importing the module under test.
 // formatChatLine wraps text at maxChars by splitting into chunks.
 // This mock replicates the wrapping behavior for predictable testing.
+// IMPORTANT: Empty text returns [''] (1 line) just like the real formatChatLine.
 vi.mock('even-toolkit/glass-chat-display', () => ({
   formatChatLine: (cl: { text: string }, maxChars: number) => {
     const lines: string[] = []
     let text = cl.text || ''
+    // Empty text still produces 1 display line (blank row)
+    if (text.length === 0) {
+      return ['']
+    }
     while (text.length > 0) {
       lines.push(text.slice(0, maxChars))
       text = text.slice(maxChars)
@@ -174,6 +179,49 @@ describe('buildMessageScrollTargets', () => {
     const lines = Array.from({ length: 8 }, () => shortLine())
     const result = buildMessageScrollTargets(lines, 8, 44)
     expect(result).toEqual([0])
+  })
+
+  it('skips empty ChatLines as scroll boundaries', () => {
+    // Empty ChatLines (from \n\n paragraph breaks) should NOT create scroll
+    // boundaries. They still consume a display line but should not be swipe stops.
+    // This prevents scrolling from degrading to line-by-line through separators.
+    const lines = [
+      shortLine('A'),      // line 0 → boundary ✓
+      { type: 'text' as const, text: '' }, // line 1 → empty, NO boundary
+      shortLine('B'),      // line 2 → boundary ✓
+      { type: 'text' as const, text: '' }, // line 3 → empty, NO boundary
+      shortLine('C'),      // line 4 → boundary ✓
+    ]
+    // totalLines = 5, viewport = 8 → fits entirely
+    // Without the fix: boundaries at 0, 1, 2, 3, 4 → [0, 1, 2, 3, 4] filtered to [0]
+    // With the fix: boundaries at 0, 2, 4 → [0] (still fits, but boundaries are correct)
+    const result = buildMessageScrollTargets(lines, 8, 44)
+    expect(result).toEqual([0])
+  })
+
+  it('empty ChatLines do not create extra swipe stops', () => {
+    // With content overflowing viewport, verify empty lines don't add swipe stops
+    const lines = [
+      shortLine('A'),      // line 0 → boundary
+      { type: 'text' as const, text: '' }, // line 1 → empty, skip
+      shortLine('B'),      // line 2 → boundary
+      { type: 'text' as const, text: '' }, // line 3 → empty, skip
+      shortLine('C'),      // line 4 → boundary
+      shortLine('D'),      // line 5 → boundary
+      shortLine('E'),      // line 6 → boundary
+      shortLine('F'),      // line 7 → boundary
+      shortLine('G'),      // line 8 → boundary
+      shortLine('H'),      // line 9 → boundary
+    ]
+    // totalLines = 10, viewport = 8, maxOffset = 2
+    // WITHOUT fix: boundaries at 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+    //   → offsets: 2-8-0=2, 2-8-1=1, 2-8-2=0, rest negative → [0, 1, 2]
+    // WITH fix: boundaries at 0, 2, 4, 5, 6, 7, 8, 9
+    //   → offsets: 2-8-0=2, 2-8-2=0, rest negative → [0, 2]
+    // Result should be same: only non-empty lines create boundaries
+    const result = buildMessageScrollTargets(lines, 8, 44)
+    // With the fix, we get fewer boundaries (no stops at empty lines)
+    expect(result).toEqual([0, 2])
   })
 })
 
