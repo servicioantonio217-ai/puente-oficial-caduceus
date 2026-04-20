@@ -106,13 +106,21 @@ export function AppGlasses() {
   // so the display function knows when new messages arrive between actions.
   const handleGlassAction = useCallback(
     (action: Parameters<typeof onGlassAction>[0], nav: Parameters<typeof onGlassAction>[1], snap: AppSnapshot) => {
+      console.log('[AppGlasses] handleGlassAction:', {
+        actionType: action.type,
+        navScreen: nav.screen,
+        navHighlightedIndex: nav.highlightedIndex,
+        snapChatLinesLength: snap.chatLines.length,
+        lastActionLineCountBefore: lastActionLineCountRef.current,
+      })
       const result = onGlassAction(action, nav, snap, ctxRef.current)
 
       // Sync the tracked count after processing the action.
       // The display function compares chatLines.length vs lastActionLineCount
       // to decide whether to auto-scroll to the start of the new message.
       lastActionLineCountRef.current = snap.chatLines.length
-      
+      console.log('[AppGlasses] lastActionLineCount after:', lastActionLineCountRef.current)
+
       return result
     },
     [],
