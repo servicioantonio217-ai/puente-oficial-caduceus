@@ -168,10 +168,11 @@ class AgentClient:
             timeout=httpx.Timeout(self.settings.agent_timeout, connect=10.0),
         ) as response:
             if response.status_code != 200:
+                body = await response.aread()
                 logger.error(
                     "Agent streaming returned %d: %s",
                     response.status_code,
-                    await response.aread()[:200],
+                    body[:200],
                     extra={
                         "extra_fields": {
                             "status_code": str(response.status_code),
