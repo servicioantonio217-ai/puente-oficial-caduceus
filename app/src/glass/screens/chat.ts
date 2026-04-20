@@ -14,11 +14,6 @@ import type { AppSnapshot, AppActions } from '../shared'
  * Layout (10 lines):
  *   Header + separator (2 lines, always visible)
  *   Content area (8 lines, scrollable)
- *
- * SCROLLING BEHAVIOR:
- * - Pagination: Long messages scroll in 8-line pages (not line-by-line)
- * - Message boundaries: Short messages scroll to next/previous message start
- * - Auto-scroll: New messages show from the START (user can read immediately)
  */
 
 /** Visible content lines (10 total - 2 header lines) */
@@ -28,121 +23,65 @@ const CONTENT_SLOTS = 8
 const MAX_CHARS = 44
 
 /**
- * Build scroll target offsets for message-based + paginated scrolling.
+ * Build scroll target offsets for message-based scrolling.
  *
- * Goals:
- * 1. Within long messages: paginate in CONTENT_SLOTS increments
- * 2. Between messages: jump to message start
- * 3. Always allow scrolling to bottom (offset 0)
+ * Instead of scrolling line-by-line, each scroll action jumps to the
+ * start of the next/previous message. Long messages that exceed
+ * contentSlots lines get additional pagination targets so the user
+ * can page through them without gaps.
  *
- * @param chatLines - Flat array of display lines
- * @param messageBoundaries - Display line indices where each MESSAGE starts
- * @param contentSlots - Visible lines per page (default 8)
- * @param maxChars - Max chars per line (default 44)
- * @returns Sorted scroll offsets (0 = bottom/latest)
+ * Always includes offset 0 (bottom/latest content) so the user can
+ * scroll back to the end after scrolling up.
+ *
+ * Returns sorted scrollOffset values (ascending: 0 = bottom/latest).
+ * scrollOffset semantics from buildChatDisplay:
+ *   start = max(0, totalLines - contentSlots - scrollOffset)
+ *   So scrollOffset = totalLines - contentSlots - displayLineIndex
  */
 export function buildMessageScrollTargets(
   chatLines: AppSnapshot['chatLines'],
-  messageBoundaries: AppSnapshot['messageBoundaries'],
   contentSlots: number = CONTENT_SLOTS,
   maxChars: number = MAX_CHARS,
 ): number[] {
   if (chatLines.length === 0) return []
 
-  // Calculate display line count for each ChatLine
-  const lineCounts = chatLines.map(cl => formatChatLine(cl, maxChars).length)
-  const totalLines = lineCounts.reduce((sum, n) => sum + n, 0)
-  const maxOffset = Math.max(0, totalLines - contentSlots)
+  const boundaries: Set<number> = new Set() // display line indices
+  let currentLine = 0
 
-  // If everything fits, only offset 0 is valid
-  if (maxOffset === 0) return [0]
+  for (const cl of chatLines) {
+    const lineCount = formatChatLine(cl, maxChars).length
+    boundaries.add(currentLine) // message start
 
-  // Build scroll targets:
-  // 1. Message starts (from messageBoundaries)
-  // 2. Pagination points within long messages
-  const boundaries: Set<number> = new Set()
-
-  // Track display line index as we iterate
-  let displayLineIndex = 0
-
-  for (let msgIdx = 0; msgIdx < chatLines.length; msgIdx++) {
-    const lineCount = lineCounts[msgIdx]
-
-    // Check if this ChatLine starts a new message
-    if (messageBoundaries.includes(msgIdx)) {
-      // This is a message start - add as scroll target
-      boundaries.add(displayLineIndex)
-    }
-
-    // Add pagination points for long content
-    // Step by contentSlots to create page-aligned targets
+    // Add pagination within long messages.
+    // Step by contentSlots from the message start so each target
+    // shifts the viewport by exactly one page — no gaps in coverage.
     let pageLine = contentSlots
-    while (displayLineIndex + pageLine < displayLineIndex + lineCount) {
-      boundaries.add(displayLineIndex + pageLine)
+    while (currentLine + pageLine < currentLine + lineCount) {
+      boundaries.add(currentLine + pageLine)
       pageLine += contentSlots
     }
 
-    displayLineIndex += lineCount
+    currentLine += lineCount
   }
 
-  // Convert display line indices to scroll offsets
-  // scrollOffset = totalLines - contentSlots - displayLineIndex
+  const totalLines = currentLine
+  const maxOffset = Math.max(0, totalLines - contentSlots)
+
+  // Convert display line indices to scrollOffset values and filter valid range
   const offsets = [...boundaries]
     .map(b => totalLines - contentSlots - b)
     .filter(offset => offset >= 0 && offset <= maxOffset)
 
-  // Always include offset 0 (bottom) for scrolling back to end
+  // Always include offset 0 (bottom) so user can scroll back to end
   offsets.push(0)
 
-  // Deduplicate and sort ascending (0 = bottom)
+  // Deduplicate and sort ascending (0 = bottom/latest content)
   return [...new Set(offsets)].sort((a, b) => a - b)
-}
-
-/**
- * Calculate the scroll offset to show the START of the last message.
- *
- * When new messages arrive, we want to show from the beginning so the user
- * can start reading immediately without scrolling.
- *
- * @param chatLines - Flat array of display lines
- * @param messageBoundaries - Display line indices where each MESSAGE starts
- * @param contentSlots - Visible lines per page
- * @param maxChars - Max chars per line
- * @returns Scroll offset showing the last message start
- */
-export function getLastMessageStartOffset(
-  chatLines: AppSnapshot['chatLines'],
-  messageBoundaries: AppSnapshot['messageBoundaries'],
-  contentSlots: number = CONTENT_SLOTS,
-  maxChars: number = MAX_CHARS,
-): number {
-  if (messageBoundaries.length === 0) return 0
-
-  // Get the last message's start position
-  const lastMessageStart = messageBoundaries[messageBoundaries.length - 1]
-
-  // Calculate display line indices
-  let displayLineIndex = 0
-  for (let i = 0; i < chatLines.length; i++) {
-    const lineCount = formatChatLine(chatLines[i], maxChars).length
-    if (i === lastMessageStart) {
-      // Found the last message start - calculate offset
-      const totalLines = chatLines.reduce(
-        (sum, cl) => sum + formatChatLine(cl, maxChars).length,
-        0
-      )
-      return Math.max(0, totalLines - contentSlots - displayLineIndex)
-    }
-    displayLineIndex += lineCount
-  }
-
-  return 0
 }
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    // Use messageCount (actual messages) not chatLines.length
-    const msgCount = snapshot.messageCount
+    const msgCount = snapshot.chatLines.length
 
     // Action-aware header label:
     // - "Idle" = connected, no action in progress
@@ -165,12 +104,10 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
       : [{ type: 'text' as const, text: '[ Tap to record ]' }]
 
     // Auto-scroll: if new messages arrived since the last glass action,
-    // show from the START of the last message (not just the bottom).
-    // This lets the user start reading immediately.
-    const hasNewMessages = snapshot.chatLines.length > snapshot.lastActionLineCount
-    const scrollOffset = hasNewMessages
-      ? getLastMessageStartOffset(snapshot.chatLines, snapshot.messageBoundaries)
-      : nav.highlightedIndex
+    // reset scrollOffset to 0 (bottom) so the latest content is visible.
+    // This handles the case where messages arrive via polling (not user action).
+    const hasNewMessages = msgCount > snapshot.lastActionLineCount
+    const scrollOffset = hasNewMessages ? 0 : nav.highlightedIndex
 
     // actionBar is required by buildChatDisplay but we don't want a visible bar.
     // Passing a single space renders as empty — satisfies the type without UI clutter.
@@ -221,11 +158,10 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     }
 
     if (action.type === 'HIGHLIGHT_MOVE') {
-      // Combined scrolling: pagination within messages + message boundaries
-      const targets = buildMessageScrollTargets(
-        snapshot.chatLines,
-        snapshot.messageBoundaries
-      )
+      // Message-based scrolling: each swipe jumps to the next/previous
+      // message boundary instead of scrolling line-by-line. Long messages
+      // get paged through in CONTENT_SLOTS increments.
+      const targets = buildMessageScrollTargets(snapshot.chatLines)
       if (targets.length === 0) return nav
 
       const current = nav.highlightedIndex

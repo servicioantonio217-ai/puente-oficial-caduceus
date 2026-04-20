@@ -39,16 +39,18 @@ export function AppGlasses() {
   )
 
   // Build chat lines — split on newlines for correct scroll calculation.
-  // Returns chatLines, messageBoundaries (for message-based scrolling),
-  // and messageCount (for header display).
-  const { chatLines, messageBoundaries, messageCount } = useMemo(
+  // even-toolkit's formatChatLine() does word-wrapping but ignores \n.
+  // Splitting ensures each paragraph is processed independently and
+  // buildMessageScrollTargets() sees the correct total line count.
+  // Prefix convention: > = user message (prompt), >> = assistant message (tool).
+  const chatLines = useMemo(
     () => normalizeChatLines(messages, error, isLoading, isRecording),
     [messages, error, isLoading, isRecording],
   )
 
   // Track message count at last glass action for auto-scroll detection.
   // When new messages arrive between actions (via polling), the chat
-  // display shows the START of the new message (not just the bottom).
+  // display resets to the bottom so the latest content is always visible.
   const lastActionLineCountRef = useRef(chatLines.length)
 
   const snapshot: AppSnapshot = {
@@ -57,8 +59,6 @@ export function AppGlasses() {
     sessions: sortedSessions,
     currentSession,
     chatLines,
-    messageBoundaries,
-    messageCount,
     lastActionLineCount: lastActionLineCountRef.current,
     isRecording,
     isProcessing: isLoading,
@@ -110,7 +110,7 @@ export function AppGlasses() {
 
       // Sync the tracked count after processing the action.
       // The display function compares chatLines.length vs lastActionLineCount
-      // to decide whether to auto-scroll to the start of the new message.
+      // to decide whether to auto-scroll to bottom.
       lastActionLineCountRef.current = snap.chatLines.length
 
       return result

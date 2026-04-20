@@ -18,13 +18,9 @@ export interface AppSnapshot {
   sessions: Session[]
   currentSession: Session | null
   chatLines: ChatLine[]
-  /** Display line indices where each MESSAGE starts (for message-based scrolling) */
-  messageBoundaries: number[]
-  /** Number of actual messages (for header display) */
-  messageCount: number
   /** Number of chat lines at the time of the last glass action.
    *  Used for auto-scroll: if chatLines.length > lastActionLineCount,
-   *  the display shows the start of the new message. */
+   *  the display resets to the bottom (scrollOffset = 0). */
   lastActionLineCount: number
   isRecording: boolean
   isProcessing: boolean
