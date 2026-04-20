@@ -24,13 +24,15 @@ vi.mock('even-toolkit/glass-screen-router', () => ({
   // Placeholder — chat.ts imports the type but doesn't use it at runtime in tests
 }))
 
-import { buildMessageScrollTargets } from '../glass/screens/chat'
+import { buildMessageScrollTargets, getLastMessageStartOffset } from '../glass/screens/chat'
 
 /**
- * Tests for message-based scrolling (Issue #25).
+ * Tests for combined message-based + paginated scrolling.
  *
- * buildMessageScrollTargets() calculates scroll target offsets that
- * align the viewport to message boundaries, with pagination for long messages.
+ * buildMessageScrollTargets() calculates scroll target offsets that:
+ * 1. Align to message boundaries (jump to message start)
+ * 2. Add pagination for long messages (scroll in pages, not line-by-line)
+ * 3. Always include offset 0 (bottom) for scrolling back to end
  *
  * ScrollOffset semantics (inverted):
  *   0 = bottom (showing latest content)
@@ -51,213 +53,89 @@ function longText(chars: number): string {
 
 describe('buildMessageScrollTargets', () => {
   it('returns empty array for no chat lines', () => {
-    const result = buildMessageScrollTargets([], 8, 44)
+    const result = buildMessageScrollTargets([], [], 8, 44)
     expect(result).toEqual([])
   })
 
-  it('returns [0] when all messages fit in viewport (no scrolling needed)', () => {
+  it('returns [0] when all messages fit in viewport', () => {
     // 3 short messages, each 1 display line = 3 total lines, viewport = 8
-    // All messages fit: totalLines=3, maxOffset=max(0, 3-8)=0
-    // Offset 0 is always included → [0]
-    // With maxOffset=0, the user cannot scroll anywhere — offset 0 is the only position.
     const lines = [shortLine('A'), shortLine('B'), shortLine('C')]
-    const result = buildMessageScrollTargets(lines, 8, 44)
+    const boundaries = [0, 1, 2] // Each line is a message start
+    const result = buildMessageScrollTargets(lines, boundaries, 8, 44)
     expect(result).toEqual([0])
   })
 
-  it('returns message boundaries when content overflows viewport', () => {
-    // 10 short messages (each "Hi" = 2 chars < 44, so 1 line each)
-    // totalLines = 10, viewport = 8, maxOffset = 2
-    // Boundaries: lines 0..9
-    // Offset for line 0: 10-8-0 = 2 ✓
-    // Offset for line 1: 10-8-1 = 1 ✓
-    // Offset for line 2: 10-8-2 = 0 ✓
-    // Offset for line 3+: negative → filtered
-    // Plus offset 0 always included
-    // Sorted ascending: [0, 1, 2]
+  it('includes message boundaries for short messages', () => {
+    // 10 short messages (each 1 line), viewport = 8
+    // totalLines = 10, maxOffset = 2
+    // Message starts at lines 0,1,2,3...
+    // Offset for line 0: 10-8-0 = 2
+    // Offset for line 1: 10-8-1 = 1
+    // Offset for line 2: 10-8-2 = 0
+    // Result: [0, 1, 2]
     const lines = Array.from({ length: 10 }, () => shortLine())
-    const result = buildMessageScrollTargets(lines, 8, 44)
+    const boundaries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    const result = buildMessageScrollTargets(lines, boundaries, 8, 44)
     expect(result).toEqual([0, 1, 2])
   })
 
-  it('includes offset 0 when last message starts at bottom edge', () => {
-    // 9 messages, each 1 line. totalLines=9, viewport=8, maxOffset=1
-    // Boundary line 0 → offset 9-8-0 = 1
-    // Boundary line 1 → offset 9-8-1 = 0
-    // Boundary line 2+ → negative, filtered
-    // Plus offset 0 always included (already present from boundary)
-    // Result: [0, 1]
-    const lines = Array.from({ length: 9 }, () => shortLine())
-    const result = buildMessageScrollTargets(lines, 8, 44)
-    expect(result).toEqual([0, 1])
-  })
-
-  it('adds pagination targets for long messages', () => {
+  it('adds pagination for long single message', () => {
     // 1 message with 200 chars, maxChars=10 → 20 display lines
-    // viewport = 8
-    // Boundaries: start(0), page(8), page(16)
-    // totalLines = 20, maxOffset = 12
-    // Offsets: 20-8-0=12, 20-8-8=4, 20-8-16=-4(filtered)
-    // Plus offset 0 always included
+    // viewport = 8, maxOffset = 12
+    // Message start at line 0 → offset 12
+    // Pagination at line 8 → offset 4
+    // Plus offset 0
     // Result: [0, 4, 12]
     const lines = [{ type: 'text' as const, text: longText(200) }]
-    const result = buildMessageScrollTargets(lines, 8, 10)
+    const boundaries = [0] // Single message starts at line 0
+    const result = buildMessageScrollTargets(lines, boundaries, 8, 10)
     expect(result).toEqual([0, 4, 12])
   })
 
-  it('returns [0] for short messages that fit in viewport', () => {
-    // 1 message with 50 chars, maxChars=10 → 5 display lines
-    // viewport = 8 → fits entirely
-    // totalLines = 5, maxOffset = max(0, 5-8) = 0
-    // Offset 0 is always included → [0]
-    const lines = [{ type: 'text' as const, text: longText(50) }]
-    const result = buildMessageScrollTargets(lines, 8, 10)
-    expect(result).toEqual([0])
-  })
-
-  it('pages through very long messages with multiple pagination points', () => {
-    // 1 message with 80 chars, maxChars=10 → 8 display lines
-    // viewport = 3
-    // Boundaries: start(0), page(3), page(6)
-    // totalLines = 8, maxOffset = 5
-    // Offsets: 8-3-0=5, 8-3-3=2, 8-3-6=-1(filtered)
-    // Plus offset 0 always included
-    // Result: [0, 2, 5]
-    const lines = [{ type: 'text' as const, text: longText(80) }]
-    const result = buildMessageScrollTargets(lines, 3, 10)
-    expect(result).toEqual([0, 2, 5])
-  })
-
-  it('handles mixed short and long messages', () => {
-    // With maxChars=10:
-    // msg0: "Hi" → 1 line (line 0)
+  it('handles mixed short and long messages with correct boundaries', () => {
+    // msg0: "Hi" → 1 line
     // msg1: 30 chars → 3 lines (lines 1-3)
     // msg2: "OK" → 1 line (line 4)
     // totalLines = 5, viewport = 3, maxOffset = 2
-    // Boundaries: 0 (msg0), 1 (msg1), 4 (msg2)
-    // msg1 pagination: 1+3=4 (already a boundary)
-    // Offsets: 5-3-0=2, 5-3-1=1, 5-3-4=-2(filtered)
-    // Plus offset 0 always included
-    // Result: [0, 1, 2]
+    // Boundaries: msg0(line 0), msg1(line 1), msg2(line 4)
     const lines = [
       shortLine('Hi'),
       { type: 'text' as const, text: longText(30) },
       shortLine('OK'),
     ]
-    const result = buildMessageScrollTargets(lines, 3, 10)
+    const boundaries = [0, 1, 4] // Message starts
+    const result = buildMessageScrollTargets(lines, boundaries, 3, 10)
+
+    // Offsets: 5-3-0=2, 5-3-1=1, 5-3-4=-2(filtered)
+    // Plus offset 0
     expect(result).toEqual([0, 1, 2])
   })
 
-  it('deduplicates targets when pagination aligns with message boundary', () => {
-    // msg0: 30 chars → 3 lines (maxChars=10)
-    // msg1: "End" → 1 line
-    // viewport = 3
-    // Boundaries: line 0 (msg0), line 3 (msg1)
-    // totalLines = 4, maxOffset = 1
-    // Offsets: 4-3-0=1, 4-3-3=-2(filtered)
-    // Plus offset 0 always included
-    // Result: [0, 1]
-    const lines = [
-      { type: 'text' as const, text: longText(30) },
-      shortLine('End'),
-    ]
-    const result = buildMessageScrollTargets(lines, 3, 10)
-    expect(result).toEqual([0, 1])
+  it('pagination works for very long message', () => {
+    // 1 message with 80 chars, maxChars=10 → 8 display lines
+    // viewport = 3, maxOffset = 5
+    // Message start at line 0 → offset 5
+    // Pagination at lines 3, 6 → offsets 2, -1(filtered)
+    // Plus offset 0
+    const lines = [{ type: 'text' as const, text: longText(80) }]
+    const boundaries = [0]
+    const result = buildMessageScrollTargets(lines, boundaries, 3, 10)
+    expect(result).toEqual([0, 2, 5])
   })
 
-  it('handles exact fit: totalLines equals contentSlots', () => {
-    // 8 messages, each 1 line = 8 total lines = contentSlots
-    // maxOffset = max(0, 8-8) = 0
-    // Boundary line 0 → offset = 8-8-0 = 0 ✓
-    // Boundary lines 1-7 → negative → filtered
-    // Result: [0]
-    const lines = Array.from({ length: 8 }, () => shortLine())
-    const result = buildMessageScrollTargets(lines, 8, 44)
-    expect(result).toEqual([0])
-  })
-})
-
-describe('Scroll navigation simulation', () => {
-  it('scrolling UP from bottom jumps to previous message', () => {
-    // 10 messages → targets = [0, 1, 2]
-    const lines = Array.from({ length: 10 }, () => shortLine())
-    const targets = buildMessageScrollTargets(lines, 8, 44)
-    expect(targets).toEqual([0, 1, 2])
-
-    // From offset 0 (bottom), UP → next > 0 = 1
-    const currentOffset = 0
-    const next = targets.find(t => t > currentOffset)
-    expect(next).toBe(1)
-  })
-
-  it('scrolling DOWN from top returns toward bottom', () => {
-    const lines = Array.from({ length: 10 }, () => shortLine())
-    const targets = buildMessageScrollTargets(lines, 8, 44)
-
-    // From offset 2 (top), DOWN → next < 2 = 1
-    const prev = [...targets].reverse().find(t => t < 2)
-    expect(prev).toBe(1)
-
-    // From offset 1, DOWN → next < 1 = 0
-    const prev2 = [...targets].reverse().find(t => t < 1)
-    expect(prev2).toBe(0)
-  })
-
-  it('cannot scroll past boundaries', () => {
-    const lines = Array.from({ length: 10 }, () => shortLine())
-    const targets = buildMessageScrollTargets(lines, 8, 44)
-
-    // At top (2), no target > 2
-    expect(targets.find(t => t > 2)).toBeUndefined()
-
-    // At bottom (0), no target < 0
-    expect([...targets].reverse().find(t => t < 0)).toBeUndefined()
-  })
-
-  it('pages through long message sequentially', () => {
-    // 1 long message (200 chars at maxChars=10 = 20 lines), viewport=8
-    // targets = [0, 4, 12]
-    const lines = [{ type: 'text' as const, text: longText(200) }]
-    const targets = buildMessageScrollTargets(lines, 8, 10)
-
-    // From offset 0 (bottom, auto-scrolled), UP → next > 0 = 4
-    expect(targets.find(t => t > 0)).toBe(4)
-
-    // From offset 4, UP → next > 4 = 12
-    expect(targets.find(t => t > 4)).toBe(12)
-
-    // From offset 12, UP → no target > 12 (at top)
-    expect(targets.find(t => t > 12)).toBeUndefined()
-
-    // From offset 12, DOWN → next < 12 = 4
-    expect([...targets].reverse().find(t => t < 12)).toBe(4)
-
-    // From offset 4, DOWN → next < 4 = 0 (back to bottom)
-    expect([...targets].reverse().find(t => t < 4)).toBe(0)
-
-    // From offset 0, DOWN → no target < 0 (already at bottom)
-    expect([...targets].reverse().find(t => t < 0)).toBeUndefined()
-  })
-
-  it('covers all display lines for a 13-line message with viewport 8', () => {
-    // Regression test: a 13-line message should have targets that make
-    // ALL 13 lines reachable, including the middle section.
-    // Before fix: only offset [5] was a target → user stuck at top or bottom.
+  it('covers all lines for 13-line message with viewport 8', () => {
+    // Regression: a 13-line message should have targets covering ALL lines
     const lines = [{ type: 'text' as const, text: longText(13 * 44) }]
-    const targets = buildMessageScrollTargets(lines, 8, 44)
+    const boundaries = [0]
+    const targets = buildMessageScrollTargets(lines, boundaries, 8, 44)
 
     // totalLines=13, maxOffset=5
-    // Boundary at line 0 → offset 13-8-0=5
-    // Pagination at line 8 → offset 13-8-8=-3 (filtered)
-    // Plus offset 0 always included
-    // Result: [0, 5]
+    // Message start: offset 5
+    // Pagination at line 8: offset -3 (filtered)
+    // Plus offset 0
     expect(targets).toEqual([0, 5])
 
-    // Verify all lines are reachable:
-    // offset 0: start=max(0,13-8-0)=5 → shows lines 5..12
-    // offset 5: start=max(0,13-8-5)=0 → shows lines 0..7
-    // Lines 0-12 all covered (0-7 at offset 5, 5-12 at offset 0)
-    // Middle lines 5-7 visible at both targets
+    // Verify coverage
     const coveredLines = new Set<number>()
     for (const offset of targets) {
       const startLine = Math.max(0, 13 - 8 - offset)
@@ -266,48 +144,63 @@ describe('Scroll navigation simulation', () => {
       }
     }
     expect(coveredLines.size).toBe(13)
+  })
+})
 
-    // Navigation: from bottom (0) → up to 5 → down back to 0
-    expect(targets.find(t => t > 0)).toBe(5)
-    expect([...targets].reverse().find(t => t < 5)).toBe(0)
+describe('getLastMessageStartOffset', () => {
+  it('returns 0 for no messages', () => {
+    const result = getLastMessageStartOffset([], [], 8, 44)
+    expect(result).toBe(0)
   })
 
-  it('covers all display lines for a 20-line message with viewport 8', () => {
-    // 20-line message, viewport=8
-    const lines = [{ type: 'text' as const, text: longText(20 * 10) }]
-    const targets = buildMessageScrollTargets(lines, 8, 10)
-
-    // totalLines=20, maxOffset=12
-    // Boundaries: line 0 → offset 12, line 8 → offset 4, line 16 → offset -4 (filtered)
-    // Plus offset 0
-    // Result: [0, 4, 12]
-    expect(targets).toEqual([0, 4, 12])
-
-    // Verify all lines reachable:
-    // offset 0: start=12 → shows 12..19
-    // offset 4: start=8 → shows 8..15
-    // offset 12: start=0 → shows 0..7
-    // Lines 0-19 ALL covered!
-    const coveredLines = new Set<number>()
-    for (const offset of targets) {
-      const startLine = Math.max(0, 20 - 8 - offset)
-      for (let i = startLine; i < startLine + 8 && i < 20; i++) {
-        coveredLines.add(i)
-      }
-    }
-    expect(coveredLines.size).toBe(20)
+  it('returns 0 when last message fits in viewport', () => {
+    // 2 messages: 1 line + 3 lines = 4 total, viewport = 8
+    // Last message starts at display line 1
+    // totalLines=4, contentSlots=8 → fits entirely → offset 0
+    const lines = [
+      shortLine('First'),
+      { type: 'text' as const, text: longText(30) }, // 3 lines
+    ]
+    const boundaries = [0, 1]
+    const result = getLastMessageStartOffset(lines, boundaries, 8, 10)
+    expect(result).toBe(0)
   })
 
-  it('navigates through mixed messages correctly', () => {
-    // Setup: msg0(1 line), msg1(30 chars=3 lines), msg2(1 line)
+  it('returns offset showing last message start when it overflows', () => {
+    // 2 messages: 1 line + 10 lines = 11 total, viewport = 8
+    // Last message starts at display line 1
+    // totalLines=11, offset = 11-8-1 = 2
+    const lines = [
+      shortLine('First'),
+      { type: 'text' as const, text: longText(100) }, // 10 lines
+    ]
+    const boundaries = [0, 1]
+    const result = getLastMessageStartOffset(lines, boundaries, 8, 10)
+    expect(result).toBe(2)
+  })
+
+  it('handles single long message', () => {
+    // 1 message, 20 lines, viewport = 8
+    // Last (and only) message starts at line 0
+    // totalLines=20, offset = 20-8-0 = 12
+    const lines = [{ type: 'text' as const, text: longText(200) }]
+    const boundaries = [0]
+    const result = getLastMessageStartOffset(lines, boundaries, 8, 10)
+    expect(result).toBe(12)
+  })
+})
+
+describe('Scroll navigation simulation', () => {
+  it('scrolls through mixed messages correctly', () => {
+    // msg0(1 line), msg1(3 lines), msg2(1 line)
     // viewport=3, maxChars=10
-    // totalLines=5, targets=[0, 1, 2]
     const lines = [
       shortLine('Hi'),
       { type: 'text' as const, text: longText(30) },
       shortLine('OK'),
     ]
-    const targets = buildMessageScrollTargets(lines, 3, 10)
+    const boundaries = [0, 1, 4]
+    const targets = buildMessageScrollTargets(lines, boundaries, 3, 10)
     expect(targets).toEqual([0, 1, 2])
 
     // From bottom (0), UP → 1 (msg1 start)
@@ -319,7 +212,46 @@ describe('Scroll navigation simulation', () => {
     // From 2, DOWN → 1
     expect([...targets].reverse().find(t => t < 2)).toBe(1)
 
-    // From 1, DOWN → 0 (back to bottom)
+    // From 1, DOWN → 0
     expect([...targets].reverse().find(t => t < 1)).toBe(0)
+  })
+
+  it('pages through long message then jumps to next message', () => {
+    // msg0: 20 lines (long), msg1: 1 line
+    // viewport = 8
+    const lines = [
+      { type: 'text' as const, text: longText(200) }, // 20 lines
+      shortLine('End'),
+    ]
+    const boundaries = [0, 20] // msg0 at 0, msg1 at 20
+    const targets = buildMessageScrollTargets(lines, boundaries, 8, 10)
+
+    // totalLines=21, maxOffset=13
+    // msg0 start: 21-8-0=13
+    // pagination at 8: 21-8-8=5
+    // msg1 start: 21-8-20=-7 (filtered)
+    // Plus 0
+    expect(targets).toEqual([0, 5, 13])
+
+    // From bottom (0), UP → 5 (first page)
+    expect(targets.find(t => t > 0)).toBe(5)
+
+    // From 5, UP → 13 (second page / msg0 start)
+    expect(targets.find(t => t > 5)).toBe(13)
+
+    // From 13, DOWN → 5
+    expect([...targets].reverse().find(t => t < 13)).toBe(5)
+  })
+
+  it('cannot scroll past boundaries', () => {
+    const lines = Array.from({ length: 10 }, () => shortLine())
+    const boundaries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    const targets = buildMessageScrollTargets(lines, boundaries, 8, 44)
+
+    // At top (2), no target > 2
+    expect(targets.find(t => t > 2)).toBeUndefined()
+
+    // At bottom (0), no target < 0
+    expect([...targets].reverse().find(t => t < 0)).toBeUndefined()
   })
 })

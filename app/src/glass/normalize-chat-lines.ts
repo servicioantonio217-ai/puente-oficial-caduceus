@@ -1,71 +1,77 @@
 import type { ChatLine } from 'even-toolkit/glass-chat-display'
 
 /**
+ * Result of normalizing chat messages into display lines.
+ */
+export interface NormalizedChat {
+  /** Flat array of ChatLines for display */
+  chatLines: ChatLine[]
+  /** Display line indices where each MESSAGE starts (not each ChatLine!) */
+  messageBoundaries: number[]
+  /** Number of actual messages (not ChatLines) */
+  messageCount: number
+}
+
+/**
  * Normalize chat messages by splitting on newlines.
  *
  * even-toolkit's formatChatLine() does word-wrapping at spaces but does NOT
- * handle `\n` characters. When a message contains empty lines (e.g. between
- * paragraphs), the embedded `\n` causes incorrect line-count calculations in
- * buildMessageScrollTargets(), resulting in auto-scroll stopping short of
- * the actual content bottom.
+ * handle `\n` characters. This function splits each message's content on `\n`
+ * into separate ChatLines, ensuring formatChatLine processes each paragraph
+ * independently and buildChatDisplay sees the correct total line count.
  *
- * This function splits each message's content on `\n` into separate ChatLines,
- * ensuring formatChatLine processes each paragraph independently and
- * buildChatDisplay sees the correct total line count for scroll calculations.
+ * **Message boundaries**: Tracks which display line each MESSAGE starts at,
+ * enabling message-based scrolling (not line-by-line).
  *
- * Empty lines from `\n\n` are preserved as empty ChatLines (render as blank
- * separator lines on the G2 display).
- *
- * **Newline normalization**: Before splitting, `\r\n` (Windows CRLF) and
- * lone `\r` (legacy Mac CR) are normalized to `\n`. This ensures correct
- * handling of messages from different platforms (STT services, Windows APIs).
- *
- * **Runtime safety**: If `content` is null/undefined (e.g. malformed API
- * response), it's treated as an empty string rather than crashing.
+ * **Prefix convention**:
+ * - `>` = user message (prompt)
+ * - `>>` = first line of assistant message (tool)
+ * - no prefix = continuation lines within a message (text)
  *
  * @param messages - Raw messages from the conversation
  * @param error - Optional error message to display as error line
  * @param isLoading - Whether the agent is processing
  * @param isRecording - Whether recording is in progress
- * @returns Array of ChatLines with newlines expanded
+ * @returns NormalizedChat with chatLines, messageBoundaries, and messageCount
  */
 export function normalizeChatLines(
   messages: Array<{ role: string; content: string }>,
   error?: string | null,
   isLoading?: boolean,
   isRecording?: boolean,
-): ChatLine[] {
-  const lines: ChatLine[] = []
+): NormalizedChat {
+  const chatLines: ChatLine[] = []
+  const messageBoundaries: number[] = []
 
   for (const msg of messages) {
-    // Runtime guard: treat null/undefined content as empty string
+    // Track where this MESSAGE starts in the display
+    messageBoundaries.push(chatLines.length)
+
     const rawContent = msg.content ?? ''
-    // Normalize newlines: CRLF (\r\n) and CR (\r) → LF (\n)
     const normalizedContent = rawContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-    // Split content on newlines - each segment becomes its own ChatLine
     const segments = normalizedContent.split('\n')
 
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i]
       if (msg.role === 'user') {
-        lines.push({ type: 'prompt', text: segment })
+        chatLines.push({ type: 'prompt', text: segment })
       } else if (msg.role === 'assistant') {
         // Only the FIRST line of an assistant response gets the '>>' prefix.
-        // Subsequent lines (continuation, empty lines, list items) render
-        // without prefix for a cleaner, more readable display.
-        lines.push({ type: i === 0 ? 'tool' : 'text', text: segment })
+        chatLines.push({ type: i === 0 ? 'tool' : 'text', text: segment })
       } else {
-        lines.push({ type: 'system', text: segment })
+        chatLines.push({ type: 'system', text: segment })
       }
     }
   }
 
-  // Show error as error line when idle (not recording, not processing)
   if (error && !isLoading && !isRecording) {
-    // Truncate long errors to fit G2 display (~44 chars/line)
     const truncated = error.length > 40 ? error.slice(0, 37) + '...' : error
-    lines.push({ type: 'error', text: truncated })
+    chatLines.push({ type: 'error', text: truncated })
   }
 
-  return lines
+  return {
+    chatLines,
+    messageBoundaries,
+    messageCount: messages.length,
+  }
 }
