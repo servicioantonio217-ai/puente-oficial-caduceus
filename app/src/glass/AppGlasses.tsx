@@ -62,6 +62,7 @@ export function AppGlasses() {
     currentSession,
     chatLines,
     lastActionLineCount: lastActionLineCountRef.current,
+    messageCount: messages.length,
     isRecording,
     isProcessing: isLoading,
     error,

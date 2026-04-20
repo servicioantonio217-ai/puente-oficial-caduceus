@@ -22,6 +22,9 @@ export interface AppSnapshot {
    *  Used for auto-scroll: if chatLines.length > lastActionLineCount,
    *  the display resets to the bottom (scrollOffset = 0). */
   lastActionLineCount: number
+  /** Actual message count (messages.length), distinct from chatLines.length
+   *  which counts display lines after newline splitting. Used for header. */
+  messageCount: number
   isRecording: boolean
   isProcessing: boolean
   error: string | null
