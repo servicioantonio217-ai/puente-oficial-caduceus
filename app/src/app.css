@@ -45,6 +45,14 @@ html, body {
   margin: 0 auto;
 }
 
+/* Preserve paragraph breaks in assistant chat messages.
+ * even-toolkit's parseAssistantContent() joins text lines with \n inside <span>,
+ * but HTML collapses \n to spaces without whitespace-pre-wrap.
+ * Only target assistant bubbles (bg-surface) to avoid affecting user messages. */
+.bg-surface .flex.flex-col > span {
+  white-space: pre-wrap;
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
