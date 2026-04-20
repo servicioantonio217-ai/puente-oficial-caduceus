@@ -21,7 +21,6 @@ from g2_bridge.auth import (
 from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
-from g2_bridge.models import AgentResponse, OutputMessage, OutputTextContent
 from g2_bridge.response import truncate_response
 from g2_bridge.stt_client import STTClient
 
@@ -149,7 +148,7 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Str
     await db.update_session_timestamp(session_id, now)
 
     async def stream() -> AsyncIterator[str]:
-        """SSE stream: transcript first, then agent response (streaming or non-streaming)."""
+        """SSE stream: transcript first, then agent response."""
         # Phase 1: Send transcript immediately
         yield _sse_event("transcript", {"text": transcript})
 
@@ -164,95 +163,53 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Str
 
             # Forward transcript to AI Agent
             agent_start = time.monotonic()
-
-            if settings.stream_enabled:
-                # Streaming mode: stream tokens incrementally
-                full_response_text = ""
-                try:
-                    async for chunk in agent.send_message_stream(transcript, history=history):
-                        # Parse the SSE chunk from the agent
-                        if chunk.startswith("data: "):
-                            data_str = chunk[6:].strip()
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                data = json.loads(data_str)
-                                delta = data.get("choices", [{}])[0].get("delta", {})
-                                content = delta.get("content", "")
-                                if content:
-                                    full_response_text += content
-                                    # Yield token chunk to client
-                                    yield _sse_event("token", {"content": content})
-                            except (json.JSONDecodeError, KeyError, IndexError):
-                                pass
-                    agent_latency = time.monotonic() - agent_start
-                except Exception as e:
-                    agent_latency = time.monotonic() - agent_start
-                    logger.error(
-                        "Agent streaming request failed: session=%s, latency=%.1fs — %s",
-                        session_id,
-                        agent_latency,
-                        e,
-                        extra={
-                            "extra_fields": {
-                                "session_id": session_id,
-                                "latency_s": f"{agent_latency:.1f}",
-                            }
-                        },
-                    )
-                    # Remove the orphaned user message — agent never saw it
-                    await db.delete_message(user_msg_id)
-                    yield _sse_event("error", {"message": f"Agent request failed: {e}"})
-                    return
-            else:
-                # Non-streaming mode: wait for full response
-                try:
-                    raw_response = await agent.send_message(transcript, history=history)
-                except Exception as e:
-                    agent_latency = time.monotonic() - agent_start
-                    logger.error(
-                        "Agent request failed: session=%s, latency=%.1fs — %s",
-                        session_id,
-                        agent_latency,
-                        e,
-                        extra={
-                            "extra_fields": {
-                                "session_id": session_id,
-                                "latency_s": f"{agent_latency:.1f}",
-                            }
-                        },
-                    )
-                    # Remove the orphaned user message — agent never saw it
-                    await db.delete_message(user_msg_id)
-                    yield _sse_event("error", {"message": f"Agent request failed: {e}"})
-                    return
-
+            try:
+                raw_response = await agent.send_message(transcript, history=history)
+            except Exception as e:
                 agent_latency = time.monotonic() - agent_start
-                agent_response = agent.parse_response(raw_response)
+                logger.error(
+                    "Agent request failed: session=%s, latency=%.1fs — %s",
+                    session_id,
+                    agent_latency,
+                    e,
+                    extra={
+                        "extra_fields": {
+                            "session_id": session_id,
+                            "latency_s": f"{agent_latency:.1f}",
+                        }
+                    },
+                )
+                # Remove the orphaned user message — agent never saw it
+                await db.delete_message(user_msg_id)
+                yield _sse_event("error", {"message": f"Agent request failed: {e}"})
+                return
 
-                # Extract text from response
-                full_response_text = ""
-                for msg in agent_response.output:
-                    for content in msg.content:
-                        full_response_text += content.text
+            agent_latency = time.monotonic() - agent_start
+            agent_response = agent.parse_response(raw_response)
+
+            # Extract text from response
+            response_text = ""
+            for msg in agent_response.output:
+                for content in msg.content:
+                    response_text += content.text
 
             logger.info(
                 "Agent response (audio): session=%s, chars=%d, latency=%.1fs",
                 session_id,
-                len(full_response_text),
+                len(response_text),
                 agent_latency,
                 extra={
                     "extra_fields": {
                         "session_id": session_id,
-                        "response_chars": str(len(full_response_text)),
+                        "response_chars": str(len(response_text)),
                         "latency_s": f"{agent_latency:.1f}",
                     }
                 },
             )
 
             # Store assistant message
-            original_len = len(full_response_text)
-            adapted_text = truncate_response(full_response_text, settings.max_response_chars)
+            original_len = len(response_text)
+            adapted_text = truncate_response(response_text, settings.max_response_chars)
             await db.add_message(str(uuid.uuid4()), session_id, "assistant", adapted_text, now)
 
         # Log truncation if it occurred
@@ -271,23 +228,14 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Str
                 },
             )
 
-        # Build agent response object for the final event
-        agent_response_obj = AgentResponse(
-            id=f"resp_{uuid.uuid4().hex[:12]}",
-            status="completed",
-            conversation=session_id,
-            output=[
-                OutputMessage(
-                    role="assistant",
-                    content=[OutputTextContent(text=adapted_text)],
-                )
-            ],
-            usage={
-                "input_tokens": 0,
-                "output_tokens": 0,
-            },  # Usage tracking not available in streaming mode
-        )
+        # Adapt response for G2 display
+        if agent_response.output:
+            adapted_output = agent_response.output.copy()
+            for msg in adapted_output:
+                msg.content = [type(c)(type="output_text", text=adapted_text) for c in msg.content]
+            agent_response.output = adapted_output
 
-        yield _sse_event("response", {"data": agent_response_obj.model_dump()})
+        agent_response.conversation = session_id
+        yield _sse_event("response", {"data": agent_response.model_dump()})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
