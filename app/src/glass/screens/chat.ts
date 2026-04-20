@@ -87,6 +87,58 @@ export function buildMessageScrollTargets(
   return [...new Set(offsets)].sort((a, b) => a - b)
 }
 
+/**
+ * Calculate the scrollOffset that puts the BEGINNING of the latest message
+ * at the top of the visible viewport.
+ *
+ * scrollOffset semantics from buildChatDisplay:
+ *   start = max(0, totalLines - contentSlots - scrollOffset)
+ *   scrollOffset = 0 → bottom (end of content)
+ *   scrollOffset = maxScroll → top (beginning of content)
+ *
+ * To show the latest message's start at the top:
+ *   start = latestMessageStartLine
+ *   → scrollOffset = totalLines - contentSlots - latestMessageStartLine
+ *
+ * If the latest message fits entirely in the viewport, this is equivalent
+ * to scrollOffset = 0 (bottom). Otherwise, the viewport starts at the
+ * message beginning and the user can scroll down to see the rest.
+ *
+ * Returns 0 as fallback for empty content.
+ */
+export function scrollToLatestMessageStart(
+  chatLines: AppSnapshot['chatLines'],
+  contentSlots: number = CONTENT_SLOTS,
+  maxChars: number = MAX_CHARS,
+): number {
+  if (chatLines.length === 0) return 0
+
+  // Walk through chatLines to find the start line of the last non-empty message
+  let currentLine = 0
+  let lastMsgStartLine = 0
+
+  for (const cl of chatLines) {
+    const lineCount = formatChatLine(cl, maxChars).length
+    // Skip empty ChatLines (paragraph breaks) — they're not message starts
+    if (cl.text !== '') {
+      lastMsgStartLine = currentLine
+    }
+    currentLine += lineCount
+  }
+
+  const totalLines = currentLine
+  const maxOffset = Math.max(0, totalLines - contentSlots)
+
+  // If the latest message fits in one viewport, just go to bottom (0)
+  if (totalLines - lastMsgStartLine <= contentSlots) return 0
+
+  // Calculate offset that puts latestMessageStartLine at the top
+  const offset = totalLines - contentSlots - lastMsgStartLine
+
+  // Clamp to valid range — 0 = bottom, maxOffset = top
+  return Math.max(0, Math.min(offset, maxOffset))
+}
+
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
     // Use messageCount (actual messages) not chatLines.length (display lines)
@@ -113,12 +165,15 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
       : [{ type: 'text' as const, text: '[ Tap to record ]' }]
 
     // Auto-scroll: if new chat lines appeared since the last glass action,
-    // reset scrollOffset to 0 (bottom) so the latest content is visible.
+    // scroll to the BEGINNING of the latest message so the user sees where
+    // the new content starts — not just the tail end of it.
     // This handles the case where messages arrive via polling (not user action).
     // Note: compares chatLines.length (current display lines) vs
     // lastActionLineCount (display lines at last glass action).
     const hasNewMessages = snapshot.chatLines.length > snapshot.lastActionLineCount
-    const scrollOffset = hasNewMessages ? 0 : nav.highlightedIndex
+    const scrollOffset = hasNewMessages
+      ? scrollToLatestMessageStart(lines, CONTENT_SLOTS, MAX_CHARS)
+      : nav.highlightedIndex
 
     // actionBar is required by buildChatDisplay but we don't want a visible bar.
     // Passing a single space renders as empty — satisfies the type without UI clutter.
