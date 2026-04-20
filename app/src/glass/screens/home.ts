@@ -16,6 +16,8 @@ const MENU_ITEMS = ['New Session', 'Sessions'] as const
  * - fieldJoin for header metadata
  * - No split layout — pure text mode
  *
+ * When disconnected, shows setup instructions instead of the menu.
+ *
  * Screen transitions are explicit: actions return the target screen
  * via nav.screen change (not via deriveScreen).
  */
@@ -23,6 +25,22 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
     const headerStatus = snapshot.connected ? 'Connected' : 'Disconnected'
     const title = fieldJoin('Caduceus', headerStatus)
+
+    // When disconnected, show setup instructions instead of menu
+    if (!snapshot.connected) {
+      const lines = [
+        { text: title, inverted: false, style: 'normal' as const },
+        { text: '', inverted: false, style: 'separator' as const },
+        { text: 'Bridge unreachable.', inverted: false, style: 'normal' as const },
+        { text: '', inverted: false, style: 'normal' as const },
+        { text: '1. Open Caduceus on phone', inverted: false, style: 'normal' as const },
+        { text: '2. Check bridge URL', inverted: false, style: 'normal' as const },
+        { text: '3. Ensure bridge is running', inverted: false, style: 'normal' as const },
+        { text: '', inverted: false, style: 'normal' as const },
+        { text: 'gitlab.com/Qu4ndo/g2-caduceus', inverted: false, style: 'normal' as const },
+      ]
+      return { lines }
+    }
 
     const lines = [
       { text: title, inverted: false, style: 'normal' as const },
