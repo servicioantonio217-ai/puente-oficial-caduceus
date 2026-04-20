@@ -81,7 +81,8 @@ export function buildMessageScrollTargets(
 
 export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    const msgCount = snapshot.chatLines.length
+    // Use messageCount (actual messages) not chatLines.length (display lines)
+    const msgCount = snapshot.messageCount
 
     // Action-aware header label:
     // - "Idle" = connected, no action in progress
