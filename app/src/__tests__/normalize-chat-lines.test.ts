@@ -11,12 +11,19 @@ import { normalizeChatLines } from '../glass/normalize-chat-lines'
  * IMPORTANT: Only the FIRST line of an assistant response gets the '>>' prefix
  * (type: 'tool'). Subsequent lines (continuation, empty lines, list items)
  * render without prefix (type: 'text') for a cleaner, more readable display.
+ *
+ * The function returns NormalizedChat with:
+ * - chatLines: flat array for display
+ * - messageBoundaries: display line indices where each MESSAGE starts
+ * - messageCount: number of actual messages
  */
 
 describe('normalizeChatLines', () => {
-  it('returns empty array for no messages', () => {
+  it('returns empty result for no messages', () => {
     const result = normalizeChatLines([])
-    expect(result).toEqual([])
+    expect(result.chatLines).toEqual([])
+    expect(result.messageBoundaries).toEqual([])
+    expect(result.messageCount).toBe(0)
   })
 
   it('handles single-line messages without newlines', () => {
@@ -25,10 +32,12 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Hi there!' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: 'Hello' },
       { type: 'tool', text: 'Hi there!' },
     ])
+    expect(result.messageBoundaries).toEqual([0, 1])
+    expect(result.messageCount).toBe(2)
   })
 
   it('splits message with single newline into two ChatLines', () => {
@@ -36,10 +45,13 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Line one\nLine two' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Line one' },
       { type: 'text', text: 'Line two' },
     ])
+    // Message starts at line 0
+    expect(result.messageBoundaries).toEqual([0])
+    expect(result.messageCount).toBe(1)
   })
 
   it('preserves empty lines from double newlines', () => {
@@ -47,11 +59,12 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Paragraph one\n\nParagraph two' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Paragraph one' },
       { type: 'text', text: '' },
       { type: 'text', text: 'Paragraph two' },
     ])
+    expect(result.messageBoundaries).toEqual([0])
   })
 
   it('handles multiple consecutive empty lines', () => {
@@ -59,7 +72,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Start\n\n\n\nEnd' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Start' },
       { type: 'text', text: '' },
       { type: 'text', text: '' },
@@ -73,7 +86,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Text\n' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Text' },
       { type: 'text', text: '' },
     ])
@@ -84,7 +97,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: '\nText' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: '' },
       { type: 'text', text: 'Text' },
     ])
@@ -96,13 +109,16 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Answer\n\nWith details' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: 'Question one' },
       { type: 'prompt', text: 'Question two' },
       { type: 'tool', text: 'Answer' },
       { type: 'text', text: '' },
       { type: 'text', text: 'With details' },
     ])
+    // Message 0 starts at line 0, Message 1 starts at line 2
+    expect(result.messageBoundaries).toEqual([0, 2])
+    expect(result.messageCount).toBe(2)
   })
 
   it('uses system type for unknown roles', () => {
@@ -110,7 +126,7 @@ describe('normalizeChatLines', () => {
       { role: 'system', content: 'System\nMessage' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'system', text: 'System' },
       { type: 'system', text: 'Message' },
     ])
@@ -119,7 +135,7 @@ describe('normalizeChatLines', () => {
   it('appends error line when error is present and not loading/recording', () => {
     const messages = [{ role: 'user', content: 'Hi' }]
     const result = normalizeChatLines(messages, 'Error message', false, false)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: 'Hi' },
       { type: 'error', text: 'Error message' },
     ])
@@ -128,7 +144,7 @@ describe('normalizeChatLines', () => {
   it('does not append error when loading', () => {
     const messages = [{ role: 'user', content: 'Hi' }]
     const result = normalizeChatLines(messages, 'Error message', true, false)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: 'Hi' },
     ])
   })
@@ -136,7 +152,7 @@ describe('normalizeChatLines', () => {
   it('does not append error when recording', () => {
     const messages = [{ role: 'user', content: 'Hi' }]
     const result = normalizeChatLines(messages, 'Error message', false, true)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: 'Hi' },
     ])
   })
@@ -145,32 +161,28 @@ describe('normalizeChatLines', () => {
     const longError = 'This is a very long error message that exceeds the limit'
     const messages = [{ role: 'user', content: 'Hi' }]
     const result = normalizeChatLines(messages, longError, false, false)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: 'Hi' },
       { type: 'error', text: 'This is a very long error message tha...' },
     ])
   })
 
   it('produces correct line count for scroll calculation', () => {
-    // Simulate an assistant response with paragraphs
     const messages = [
       { role: 'user', content: 'Explain' },
       { role: 'assistant', content: 'First paragraph.\n\nSecond paragraph.\n\nThird paragraph.' },
     ]
     const result = normalizeChatLines(messages)
-
     // 1 user line + 5 assistant lines (3 paragraphs + 2 empty lines)
-    expect(result.length).toBe(6)
+    expect(result.chatLines.length).toBe(6)
   })
 
   it('handles real-world assistant response with list and paragraphs', () => {
-    // Simulate a typical AI response with list items and paragraphs
     const messages = [
       { role: 'assistant', content: 'Here are the options:\n\n1. Option A\n2. Option B\n\nChoose wisely.' },
     ]
     const result = normalizeChatLines(messages)
-
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Here are the options:' },
       { type: 'text', text: '' },
       { type: 'text', text: '1. Option A' },
@@ -178,7 +190,36 @@ describe('normalizeChatLines', () => {
       { type: 'text', text: '' },
       { type: 'text', text: 'Choose wisely.' },
     ])
-    expect(result.length).toBe(6)
+    expect(result.chatLines.length).toBe(6)
+  })
+
+  // ============================================================
+  // Message boundary tests
+  // ============================================================
+
+  it('tracks message boundaries correctly for multi-line messages', () => {
+    const messages = [
+      { role: 'user', content: 'A' },
+      { role: 'assistant', content: 'B1\nB2\nB3' },
+      { role: 'user', content: 'C' },
+    ]
+    const result = normalizeChatLines(messages)
+    expect(result.chatLines.length).toBe(5) // 1 + 3 + 1
+    expect(result.messageBoundaries).toEqual([0, 1, 4])
+    expect(result.messageCount).toBe(3)
+  })
+
+  it('message boundaries enable message-based scrolling', () => {
+    // Simulate: user asks, assistant gives long multi-paragraph response
+    const messages = [
+      { role: 'user', content: 'What is X?' },
+      { role: 'assistant', content: 'Line1\nLine2\nLine3\nLine4\nLine5' },
+    ]
+    const result = normalizeChatLines(messages)
+    // User message at line 0, Assistant message at line 1
+    expect(result.messageBoundaries).toEqual([0, 1])
+    // Scrolling should jump from line 1 (assistant start) to line 0 (user start)
+    // NOT line-by-line through the assistant's content
   })
 
   // ============================================================
@@ -190,7 +231,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Line one\r\nLine two' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Line one' },
       { type: 'text', text: 'Line two' },
     ])
@@ -201,7 +242,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Line one\rLine two' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Line one' },
       { type: 'text', text: 'Line two' },
     ])
@@ -212,7 +253,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'A\r\nB\nC\rD' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'A' },
       { type: 'text', text: 'B' },
       { type: 'text', text: 'C' },
@@ -225,7 +266,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Para one\r\n\r\nPara two' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'Para one' },
       { type: 'text', text: '' },
       { type: 'text', text: 'Para two' },
@@ -241,7 +282,7 @@ describe('normalizeChatLines', () => {
       { role: 'user', content: null as unknown as string },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: '' },
     ])
   })
@@ -251,7 +292,7 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: undefined as unknown as string },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: '' },
     ])
   })
@@ -261,7 +302,7 @@ describe('normalizeChatLines', () => {
       { role: 'user', content: '' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'prompt', text: '' },
     ])
   })
@@ -277,11 +318,12 @@ describe('normalizeChatLines', () => {
       { role: 'assistant', content: 'Second response\nwith two lines' },
     ]
     const result = normalizeChatLines(messages)
-    expect(result).toEqual([
+    expect(result.chatLines).toEqual([
       { type: 'tool', text: 'First response' },
       { type: 'prompt', text: 'Follow-up' },
       { type: 'tool', text: 'Second response' },
       { type: 'text', text: 'with two lines' },
     ])
+    expect(result.messageBoundaries).toEqual([0, 1, 2])
   })
 })
