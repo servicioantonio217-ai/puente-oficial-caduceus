@@ -173,15 +173,6 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
       ? autoScrollOffset
       : nav.highlightedIndex
 
-    console.log('[Chat] display:', {
-      chatLinesLength: snapshot.chatLines.length,
-      lastActionLineCount: snapshot.lastActionLineCount,
-      hasNewMessages,
-      autoScrollOffset,
-      navHighlightedIndex: nav.highlightedIndex,
-      scrollOffset,
-    })
-
     // actionBar is required by buildChatDisplay but we don't want a visible bar.
     // Passing a single space renders as empty — satisfies the type without UI clutter.
     return buildChatDisplay({
@@ -236,13 +227,6 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
         snapshot.chatLines,
         snapshot.messageBoundaries
       )
-      console.log('[Chat] HIGHLIGHT_MOVE', {
-        direction: action.direction,
-        targets,
-        current: nav.highlightedIndex,
-        messageBoundaries: snapshot.messageBoundaries,
-        chatLinesCount: snapshot.chatLines.length,
-      })
       if (targets.length === 0) return nav
 
       const current = nav.highlightedIndex
@@ -250,13 +234,11 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
       if (action.direction === 'up') {
         // Going to earlier content: find next target above current position
         const next = targets.find(t => t > current)
-        console.log('[Chat] UP: next target =', next)
-        return { ...nav, highlightedIndex: next ?? current }
+                return { ...nav, highlightedIndex: next ?? current }
       } else {
         // Going to later content: find next target below current position
         const prev = [...targets].reverse().find(t => t < current)
-        console.log('[Chat] DOWN: prev target =', prev)
-        return { ...nav, highlightedIndex: prev ?? current }
+                return { ...nav, highlightedIndex: prev ?? current }
       }
     }
 
