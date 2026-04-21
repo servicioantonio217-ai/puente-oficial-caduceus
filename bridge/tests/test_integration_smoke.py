@@ -295,8 +295,8 @@ async def test_agent_failure_returns_502(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_long_response_is_truncated(client: AsyncClient) -> None:
-    """Responses exceeding max_response_chars should be truncated."""
+async def test_long_response_returned_in_full(client: AsyncClient) -> None:
+    """Long responses should be returned in full — no server-side truncation."""
 
     long_response = {
         "id": "chatcmpl-long",
@@ -310,7 +310,7 @@ async def test_long_response_is_truncated(client: AsyncClient) -> None:
         ],
     }
 
-    # Create session with small max_response_chars
+    # Create session — max_response_chars is ignored now
     resp = await client.post("/v1/sessions", json={}, headers=HEADERS)
     session_id = resp.json()["id"]
 
@@ -326,15 +326,17 @@ async def test_long_response_is_truncated(client: AsyncClient) -> None:
         )
     assert resp.status_code == 200
     agent_resp = resp.json()
-    # The adapted text in the output should be truncated
-    adapted_text = agent_resp["output"][0]["content"][0]["text"]
-    assert len(adapted_text) <= 505  # 500 + "..."
+    # The full text should be returned without truncation
+    full_text = agent_resp["output"][0]["content"][0]["text"]
+    expected_text = "Word. " * 500
+    assert full_text == expected_text
+    assert len(full_text) > 500  # well above old truncation limit
 
-    # The stored message should also be truncated
+    # The stored message should also be the full text
     resp = await client.get(f"/v1/sessions/{session_id}", headers=HEADERS)
     detail = resp.json()
     stored_text = detail["messages"][1]["content"]
-    assert len(stored_text) <= 505
+    assert stored_text == expected_text
 
 
 # ============================================================

@@ -58,8 +58,8 @@ async def test_send_message_success(app_with_state, client):
     assert data["output"][0]["content"][0]["text"] == "Hello from the AI agent!"
 
 
-async def test_send_message_truncation(client):
-    """Long responses should be truncated to max_response_chars."""
+async def test_send_message_no_truncation(client):
+    """Long responses should be returned in full — no server-side truncation."""
     from httpx import ASGITransport, AsyncClient
 
     from g2_bridge.agent_client import AgentClient
@@ -102,7 +102,10 @@ async def test_send_message_truncation(client):
         assert response.status_code == 200
         data = response.json()
         text = data["output"][0]["content"][0]["text"]
-        assert len(text) <= 104  # 100 chars + "..."
+        # Full response should be returned — no truncation
+        long_text = "This is a very long response. " * 50
+        assert text == long_text
+        assert len(text) > 100  # well above the old max_response_chars limit
     finally:
         await agent.close()
         await db.close()

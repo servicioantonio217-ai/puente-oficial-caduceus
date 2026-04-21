@@ -21,7 +21,6 @@ from g2_bridge.auth import (
 from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
-from g2_bridge.response import truncate_response
 from g2_bridge.stt_client import STTClient
 
 logger = logging.getLogger(__name__)
@@ -207,33 +206,15 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Str
                 },
             )
 
-            # Store assistant message
-            original_len = len(response_text)
-            adapted_text = truncate_response(response_text, settings.max_response_chars)
-            await db.add_message(str(uuid.uuid4()), session_id, "assistant", adapted_text, now)
+            # Store assistant message (full, untruncated — glasses handle display via scroll)
+            await db.add_message(str(uuid.uuid4()), session_id, "assistant", response_text, now)
 
-        # Log truncation if it occurred
-        if len(adapted_text) != original_len:
-            logger.info(
-                "Response adapted: session=%s, %d -> %d chars",
-                session_id,
-                original_len,
-                len(adapted_text),
-                extra={
-                    "extra_fields": {
-                        "session_id": session_id,
-                        "original_chars": str(original_len),
-                        "adapted_chars": str(len(adapted_text)),
-                    }
-                },
-            )
-
-        # Adapt response for G2 display
+        # Return full response to client (smartphone gets full text, glasses scroll via buildChatDisplay)
         if agent_response.output:
-            adapted_output = agent_response.output.copy()
-            for msg in adapted_output:
-                msg.content = [type(c)(type="output_text", text=adapted_text) for c in msg.content]
-            agent_response.output = adapted_output
+            full_output = agent_response.output.copy()
+            for msg in full_output:
+                msg.content = [type(c)(type="output_text", text=response_text) for c in msg.content]
+            agent_response.output = full_output
 
         agent_response.conversation = session_id
         yield _sse_event("response", {"data": agent_response.model_dump()})
