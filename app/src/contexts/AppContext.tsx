@@ -642,7 +642,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer)
       setIsReconnecting(false)
     }
-  }, [connected, config.url, config.token]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [connected, config.url, config.token])
 
   return (
     <AppContext.Provider
