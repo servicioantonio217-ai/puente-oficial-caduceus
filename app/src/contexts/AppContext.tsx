@@ -137,6 +137,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [agentTimeoutSettings, setAgentTimeoutSettingsState] = useState<AgentTimeoutSettings>(loadAgentTimeoutSettings)
   const [connected, setConnected] = useState(false)
   const [isReconnecting, setIsReconnecting] = useState(false)
+  // Tracks user intent: true after connect(), false after disconnect().
+  // Prevents auto-reconnect from firing after a deliberate disconnect.
+  const [wantsConnection, setWantsConnection] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -191,6 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const connect = useCallback(async () => {
     const c = configRef.current
     if (!c.url || !c.token) return
+    setWantsConnection(true)
     setError(null)
     try {
       const result = await api.healthCheck(c)
@@ -207,6 +211,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const disconnect = useCallback(() => {
+    setWantsConnection(false)
     setConnected(false)
     setSessions([])
     setCurrentSession(null)
@@ -549,6 +554,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // Auto-connect with whatever config is now available
         if (effectiveConfig.url && effectiveConfig.token) {
+          setWantsConnection(true)
           api.healthCheck(effectiveConfig).then((result) => {
             if (cancelled) return
             setConnected(result.ok)
@@ -589,9 +595,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // with exponential backoff (10s → 20s → 30s → 30s…). On success,
   // restore the full connection state via the existing connect() flow.
   // The interval stops as soon as the app reconnects.
+  // Only activates when the user WANTS to be connected (didn't manually disconnect).
   useEffect(() => {
-    // Only activate when: disconnected AND we have credentials to retry
-    if (connected || !config.url || !config.token) {
+    // Only activate when: disconnected AND user wants connection AND we have credentials
+    if (connected || !wantsConnection || !config.url || !config.token) {
       setIsReconnecting(false)
       return
     }
@@ -642,7 +649,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer)
       setIsReconnecting(false)
     }
-  }, [connected, config.url, config.token])
+  }, [connected, wantsConnection, config.url, config.token])
 
   return (
     <AppContext.Provider
