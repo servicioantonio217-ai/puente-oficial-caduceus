@@ -590,6 +590,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Connection health monitor ────────────────────────────────────
+  // While connected, periodically ping /health to detect silent drops.
+  // If the bridge goes unreachable, set connected=false which triggers
+  // the reconnection poller below.
+  useEffect(() => {
+    if (!connected || !config.url || !config.token) return
+
+    const MONITOR_INTERVAL_MS = 30_000
+    let cancelled = false
+
+    const timer = setInterval(async () => {
+      if (cancelled) return
+      try {
+        const result = await api.healthCheck(configRef.current)
+        if (cancelled) return
+        if (!result.ok) {
+          setConnected(false)
+        }
+      } catch {
+        if (!cancelled) setConnected(false)
+      }
+    }, MONITOR_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [connected, config.url, config.token])
+
   // ── Automatic reconnection when disconnected ──────────────────────
   // When the bridge becomes unreachable, periodically poll /health
   // with exponential backoff (10s → 20s → 30s → 30s…). On success,
