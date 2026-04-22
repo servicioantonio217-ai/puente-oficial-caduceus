@@ -99,15 +99,15 @@ describe('buildMessageScrollTargets', () => {
 
   it('adds pagination targets for long messages', () => {
     // 1 message with 200 chars, maxChars=10 → 20 display lines
-    // viewport = 8
-    // Boundaries: start(0), page(8), page(16)
+    // viewport = 8, step = 8-2 = 6
+    // Boundaries: start(0), page(6), page(12), page(18)
     // totalLines = 20, maxOffset = 12
-    // Offsets: 20-8-0=12, 20-8-8=4, 20-8-16=-4(filtered)
+    // Offsets: 20-8-0=12, 20-8-6=6, 20-8-12=0, 20-8-18=-6(filtered)
     // Plus offset 0 always included
-    // Result: [0, 4, 12]
+    // Result: [0, 6, 12]
     const lines = [{ type: 'text' as const, text: longText(200) }]
     const result = buildMessageScrollTargets(lines, 8, 10)
-    expect(result).toEqual([0, 4, 12])
+    expect(result).toEqual([0, 6, 12])
   })
 
   it('returns [0] for short messages that fit in viewport', () => {
@@ -122,15 +122,15 @@ describe('buildMessageScrollTargets', () => {
 
   it('pages through very long messages with multiple pagination points', () => {
     // 1 message with 80 chars, maxChars=10 → 8 display lines
-    // viewport = 3
-    // Boundaries: start(0), page(3), page(6)
+    // viewport = 3, step = 3-2 = 1
+    // Boundaries: start(0), page(1), page(2), page(3), page(4), page(5), page(6), page(7)
     // totalLines = 8, maxOffset = 5
-    // Offsets: 8-3-0=5, 8-3-3=2, 8-3-6=-1(filtered)
+    // Offsets: 8-3-0=5, 8-3-1=4, 8-3-2=3, 8-3-3=2, 8-3-4=1, 8-3-5=0, 8-3-6=-1(filtered)
     // Plus offset 0 always included
-    // Result: [0, 2, 5]
+    // Result: [0, 1, 2, 3, 4, 5]
     const lines = [{ type: 'text' as const, text: longText(80) }]
     const result = buildMessageScrollTargets(lines, 3, 10)
-    expect(result).toEqual([0, 2, 5])
+    expect(result).toEqual([0, 1, 2, 3, 4, 5])
   })
 
   it('handles mixed short and long messages', () => {
@@ -263,25 +263,25 @@ describe('Scroll navigation simulation', () => {
   })
 
   it('pages through long message sequentially', () => {
-    // 1 long message (200 chars at maxChars=10 = 20 lines), viewport=8
-    // targets = [0, 4, 12]
+    // 1 long message (200 chars at maxChars=10 = 20 lines), viewport=8, step=6
+    // targets = [0, 6, 12]
     const lines = [{ type: 'text' as const, text: longText(200) }]
     const targets = buildMessageScrollTargets(lines, 8, 10)
 
-    // From offset 0 (bottom, auto-scrolled), UP → next > 0 = 4
-    expect(targets.find(t => t > 0)).toBe(4)
+    // From offset 0 (bottom, auto-scrolled), UP → next > 0 = 6
+    expect(targets.find(t => t > 0)).toBe(6)
 
-    // From offset 4, UP → next > 4 = 12
-    expect(targets.find(t => t > 4)).toBe(12)
+    // From offset 6, UP → next > 6 = 12
+    expect(targets.find(t => t > 6)).toBe(12)
 
     // From offset 12, UP → no target > 12 (at top)
     expect(targets.find(t => t > 12)).toBeUndefined()
 
-    // From offset 12, DOWN → next < 12 = 4
-    expect([...targets].reverse().find(t => t < 12)).toBe(4)
+    // From offset 12, DOWN → next < 12 = 6
+    expect([...targets].reverse().find(t => t < 12)).toBe(6)
 
-    // From offset 4, DOWN → next < 4 = 0 (back to bottom)
-    expect([...targets].reverse().find(t => t < 4)).toBe(0)
+    // From offset 6, DOWN → next < 6 = 0 (back to bottom)
+    expect([...targets].reverse().find(t => t < 6)).toBe(0)
 
     // From offset 0, DOWN → no target < 0 (already at bottom)
     expect([...targets].reverse().find(t => t < 0)).toBeUndefined()
@@ -321,19 +321,20 @@ describe('Scroll navigation simulation', () => {
   })
 
   it('covers all display lines for a 20-line message with viewport 8', () => {
-    // 20-line message, viewport=8
+    // 20-line message, viewport=8, step=6
     const lines = [{ type: 'text' as const, text: longText(20 * 10) }]
     const targets = buildMessageScrollTargets(lines, 8, 10)
 
-    // totalLines=20, maxOffset=12
-    // Boundaries: line 0 → offset 12, line 8 → offset 4, line 16 → offset -4 (filtered)
+    // totalLines=20, maxOffset=12, step=6
+    // Boundaries: line 0, line 6, line 12, line 18
+    // Offsets: 20-8-0=12, 20-8-6=6, 20-8-12=0, 20-8-18=-6(filtered)
     // Plus offset 0
-    // Result: [0, 4, 12]
-    expect(targets).toEqual([0, 4, 12])
+    // Result: [0, 6, 12]
+    expect(targets).toEqual([0, 6, 12])
 
     // Verify all lines reachable:
     // offset 0: start=12 → shows 12..19
-    // offset 4: start=8 → shows 8..15
+    // offset 6: start=6 → shows 6..13
     // offset 12: start=0 → shows 0..7
     // Lines 0-19 ALL covered!
     const coveredLines = new Set<number>()
@@ -369,5 +370,207 @@ describe('Scroll navigation simulation', () => {
 
     // From 1, DOWN → 0 (back to bottom)
     expect([...targets].reverse().find(t => t < 1)).toBe(0)
+  })
+})
+
+/**
+ * Scroll indicator gap tests (Issue #71 root cause).
+ *
+ * even-toolkit's buildChatDisplay uses applyScrollIndicators() which
+ * REPLACES the first visible content line with ▲ (when content above)
+ * and/or the last visible line with ▼ (when content below).
+ *
+ * These tests simulate that indicator replacement and verify that
+ * EVERY display line is visible at some scroll position, even after
+ * the indicator lines are removed from the "effectively visible" set.
+ *
+ * This is the critical gap that MR !129 (step=contentSlots-1) did NOT fix:
+ * with step=7, the "seam" line between two viewports sits at position 0
+ * (→▲) in one viewport and position 7 (→▼) in the other — hidden at both.
+ * The fix uses step=contentSlots-2 (6) which provides 2 lines of overlap,
+ * so every line appears in a non-indicator position at some viewport.
+ */
+describe('Scroll indicator coverage (Issue #71)', () => {
+  // Simulate applyScrollIndicators: return the line indices that are
+  // effectively visible (first/last replaced by ▲/▼ indicators).
+  function getEffectivelyVisibleLines(
+    start: number,
+    totalLines: number,
+    contentSlots: number,
+  ): number[] {
+    const end = Math.min(start + contentSlots, totalLines)
+    const visible: number[] = []
+    for (let i = start; i < end; i++) {
+      // Skip first line (replaced by ▲) when there's content above
+      if (i === start && start > 0) continue
+      // Skip last line (replaced by ▼) when there's content below
+      if (i === end - 1 && end < totalLines) continue
+      visible.push(i)
+    }
+    return visible
+  }
+
+  // Check that ALL display lines are effectively visible at some scroll target
+  function assertFullCoverage(
+    chatLines: Array<{ type: string; text: string }>,
+    contentSlots: number,
+    maxChars: number,
+    label: string,
+  ) {
+    const targets = buildMessageScrollTargets(chatLines, contentSlots, maxChars)
+
+    // Calculate totalLines using the mock formatChatLine
+    let totalLines = 0
+    for (const cl of chatLines) {
+      const text = cl.text || ''
+      if (text.length === 0) {
+        totalLines += 1
+      } else {
+        totalLines += Math.ceil(text.length / maxChars)
+      }
+    }
+
+    // Collect effectively visible lines across all targets
+    const visibleLines = new Set<number>()
+    for (const offset of targets) {
+      const start = Math.max(0, totalLines - contentSlots - offset)
+      for (const lineIdx of getEffectivelyVisibleLines(start, totalLines, contentSlots)) {
+        visibleLines.add(lineIdx)
+      }
+    }
+
+    // Check every line is covered
+    const missing: number[] = []
+    for (let i = 0; i < totalLines; i++) {
+      if (!visibleLines.has(i)) missing.push(i)
+    }
+
+    expect(missing).toEqual([] as number[])
+  }
+
+  it('covers all lines for a 20-line message with viewport 8 (indicators)', () => {
+    // 20 lines, viewport=8, step=6
+    // Before fix (step=8): lines 7 and 8 were hidden by indicators
+    assertFullCoverage(
+      [{ type: 'text', text: longText(200) }],
+      8, 10,
+      '20-line single message',
+    )
+  })
+
+  it('covers all lines for a 25-line message with viewport 8 (indicators)', () => {
+    // 25 lines → boundaries at 0, 6, 12, 18, 24
+    // This is the case that proved the bug: with step=8, lines 7,8,15,16 were hidden
+    assertFullCoverage(
+      [{ type: 'text', text: longText(250) }],
+      8, 10,
+      '25-line single message',
+    )
+  })
+
+  it('covers all lines for messages of various lengths (1-60 lines)', () => {
+    // Brute-force: test many different message lengths
+    for (let chars = 10; chars <= 600; chars += 10) {
+      const lineCount = Math.ceil(chars / 10)
+      assertFullCoverage(
+        [{ type: 'text', text: longText(chars) }],
+        8, 10,
+        `single message, ${lineCount} lines`,
+      )
+    }
+  })
+
+  it('covers all lines with small viewport (3 slots)', () => {
+    // Small viewport amplifies the indicator effect
+    // step = 3-2 = 1 → every line is a target
+    for (let chars = 10; chars <= 100; chars += 10) {
+      assertFullCoverage(
+        [{ type: 'text', text: longText(chars) }],
+        3, 10,
+        `viewport=3, ${Math.ceil(chars/10)} lines`,
+      )
+    }
+  })
+
+  it('covers all lines with mixed short and long messages', () => {
+    const scenarios = [
+      {
+        lines: [
+          shortLine('Hi'),
+          { type: 'text', text: longText(100) },
+          shortLine('OK'),
+          { type: 'text', text: longText(200) },
+        ],
+        contentSlots: 8,
+        maxChars: 10,
+      },
+      {
+        lines: [
+          { type: 'text', text: longText(80) },
+          shortLine('Break'),
+          { type: 'text', text: longText(80) },
+          shortLine('End'),
+        ],
+        contentSlots: 8,
+        maxChars: 10,
+      },
+      {
+        lines: [
+          shortLine('A'),
+          shortLine('B'),
+          { type: 'text', text: longText(150) },
+          shortLine('C'),
+          { type: 'text', text: longText(90) },
+        ],
+        contentSlots: 8,
+        maxChars: 10,
+      },
+    ]
+    for (const s of scenarios) {
+      assertFullCoverage(s.lines as Array<{type: string; text: string}>, s.contentSlots, s.maxChars, 'mixed messages')
+    }
+  })
+
+  it('covers all lines with empty paragraph breaks', () => {
+    // Empty lines consume display slots but don't create boundaries
+    const lines = [
+      { type: 'text', text: longText(150) },
+      { type: 'text', text: '' },
+      { type: 'text', text: longText(150) },
+      { type: 'text', text: '' },
+      { type: 'text', text: longText(100) },
+    ]
+    assertFullCoverage(lines, 8, 10, 'paragraphs with empty lines')
+  })
+
+  it('covers all lines with many short messages', () => {
+    // Each short message = 1 boundary. More boundaries = more viewports.
+    const lines = Array.from({ length: 20 }, (_, i) => shortLine(`Msg${i}`))
+    assertFullCoverage(lines, 8, 44, '20 short messages')
+  })
+
+  it('covers all lines at exact viewport boundaries', () => {
+    // Test messages that produce exactly N*contentSlots lines
+    for (let multiplier = 1; multiplier <= 5; multiplier++) {
+      const chars = multiplier * 8 * 10 // exactly N * viewport lines
+      assertFullCoverage(
+        [{ type: 'text', text: longText(chars) }],
+        8, 10,
+        `exact ${multiplier}*8 lines`,
+      )
+    }
+  })
+
+  it('covers all lines for real-world chat scenario', () => {
+    // Simulate a typical AI chat: user asks, AI responds at length
+    const lines = [
+      { type: 'prompt', text: 'Tell me about quantum computing' },
+      { type: 'tool', text: 'Quantum computing is a type of computation that harnesses quantum mechanical phenomena, such as superposition and entanglement, to process information in fundamentally different ways than classical computers.' },
+      { type: 'text', text: '' },
+      { type: 'text', text: 'Unlike classical bits that are either 0 or 1, quantum bits (qubits) can exist in multiple states simultaneously. This property enables quantum computers to explore many possible solutions at once.' },
+      { type: 'prompt', text: 'What about error correction?' },
+      { type: 'tool', text: 'Quantum error correction is essential because qubits are extremely fragile and prone to decoherence. Current quantum computers have error rates that limit practical applications, but advances in error correction codes and fault-tolerant designs are rapidly improving.' },
+    ]
+    assertFullCoverage(lines, 8, 44, 'real-world chat')
   })
 })

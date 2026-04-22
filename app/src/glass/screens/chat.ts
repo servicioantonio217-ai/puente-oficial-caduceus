@@ -23,12 +23,37 @@ const CONTENT_SLOTS = 8
 const MAX_CHARS = 44
 
 /**
+ * Pagination step for long messages.
+ *
+ * even-toolkit's buildChatDisplay uses applyScrollIndicators() which
+ * REPLACES the first and/or last visible content line with scroll
+ * indicators (▲/▼) when there is content above/below the viewport.
+ *
+ * This means at most 2 of the contentSlots lines are hidden by indicators,
+ * reducing the effectively visible lines to contentSlots - 2.
+ *
+ * To guarantee that every display line is visible at some scroll position,
+ * consecutive viewports must overlap by at least 2 lines. With step =
+ * contentSlots - 2, the viewport at boundary B shows [B..B+C-1] where
+ * lines B (▲) and B+C-1 (▼) are hidden; the next viewport at B+step
+ * covers the overlap region where those hidden lines are visible in
+ * non-indicator positions.
+ *
+ * Why contentSlots - 1 (MR !129) wasn't enough:
+ *   With step=7, the "seam" line between two viewports sits at position 0
+ *   (→ ▲ replaces it) in one viewport and position 7 (→ ▼ replaces it)
+ *   in the other — hidden at BOTH positions, never visible.
+ */
+const SCROLL_STEP_ADJUSTMENT = 2
+
+/**
  * Build scroll target offsets for message-based scrolling.
  *
  * Instead of scrolling line-by-line, each scroll action jumps to the
  * start of the next/previous message. Long messages that exceed
  * contentSlots lines get additional pagination targets so the user
- * can page through them without gaps.
+ * can page through them without gaps — accounting for the ▲/▼ scroll
+ * indicators that replace content lines at viewport boundaries.
  *
  * Always includes offset 0 (bottom/latest content) so the user can
  * scroll back to the end after scrolling up.
@@ -44,6 +69,11 @@ export function buildMessageScrollTargets(
   maxChars: number = MAX_CHARS,
 ): number[] {
   if (chatLines.length === 0) return []
+
+  // Effective pagination step: reduce by SCROLL_STEP_ADJUSTMENT to guarantee
+  // overlap between consecutive viewports, compensating for scroll indicators
+  // that hide the first and/or last content line.
+  const step = Math.max(1, contentSlots - SCROLL_STEP_ADJUSTMENT)
 
   const boundaries: Set<number> = new Set() // display line indices
   let currentLine = 0
@@ -61,12 +91,13 @@ export function buildMessageScrollTargets(
     boundaries.add(currentLine) // message start
 
     // Add pagination within long messages.
-    // Step by contentSlots from the message start so each target
-    // shifts the viewport by exactly one page — no gaps in coverage.
-    let pageLine = contentSlots
+    // Step by (contentSlots - 2) from the message start so each target
+    // shifts the viewport with enough overlap to compensate for ▲/▼
+    // indicators replacing content at viewport edges.
+    let pageLine = step
     while (currentLine + pageLine < currentLine + lineCount) {
       boundaries.add(currentLine + pageLine)
-      pageLine += contentSlots
+      pageLine += step
     }
 
     currentLine += lineCount
