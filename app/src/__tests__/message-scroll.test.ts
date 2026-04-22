@@ -412,7 +412,7 @@ describe('Scroll indicator coverage (Issue #71)', () => {
 
   // Check that ALL display lines are effectively visible at some scroll target
   function assertFullCoverage(
-    chatLines: Array<{ type: string; text: string }>,
+    chatLines: Array<{ type: 'text' | 'prompt' | 'tool' | 'error' | 'system'; text: string }>,
     contentSlots: number,
     maxChars: number,
     label: string,
@@ -497,18 +497,18 @@ describe('Scroll indicator coverage (Issue #71)', () => {
       {
         lines: [
           shortLine('Hi'),
-          { type: 'text', text: longText(100) },
+          { type: 'text' as const, text: longText(100) },
           shortLine('OK'),
-          { type: 'text', text: longText(200) },
+          { type: 'text' as const, text: longText(200) },
         ],
         contentSlots: 8,
         maxChars: 10,
       },
       {
         lines: [
-          { type: 'text', text: longText(80) },
+          { type: 'text' as const, text: longText(80) },
           shortLine('Break'),
-          { type: 'text', text: longText(80) },
+          { type: 'text' as const, text: longText(80) },
           shortLine('End'),
         ],
         contentSlots: 8,
@@ -518,27 +518,27 @@ describe('Scroll indicator coverage (Issue #71)', () => {
         lines: [
           shortLine('A'),
           shortLine('B'),
-          { type: 'text', text: longText(150) },
+          { type: 'text' as const, text: longText(150) },
           shortLine('C'),
-          { type: 'text', text: longText(90) },
+          { type: 'text' as const, text: longText(90) },
         ],
         contentSlots: 8,
         maxChars: 10,
       },
     ]
     for (const s of scenarios) {
-      assertFullCoverage(s.lines as Array<{type: string; text: string}>, s.contentSlots, s.maxChars, 'mixed messages')
+      assertFullCoverage(s.lines, s.contentSlots, s.maxChars, 'mixed messages')
     }
   })
 
   it('covers all lines with empty paragraph breaks', () => {
     // Empty lines consume display slots but don't create boundaries
     const lines = [
-      { type: 'text', text: longText(150) },
-      { type: 'text', text: '' },
-      { type: 'text', text: longText(150) },
-      { type: 'text', text: '' },
-      { type: 'text', text: longText(100) },
+      { type: 'text' as const, text: longText(150) },
+      { type: 'text' as const, text: '' },
+      { type: 'text' as const, text: longText(150) },
+      { type: 'text' as const, text: '' },
+      { type: 'text' as const, text: longText(100) },
     ]
     assertFullCoverage(lines, 8, 10, 'paragraphs with empty lines')
   })
@@ -564,12 +564,12 @@ describe('Scroll indicator coverage (Issue #71)', () => {
   it('covers all lines for real-world chat scenario', () => {
     // Simulate a typical AI chat: user asks, AI responds at length
     const lines = [
-      { type: 'prompt', text: 'Tell me about quantum computing' },
-      { type: 'tool', text: 'Quantum computing is a type of computation that harnesses quantum mechanical phenomena, such as superposition and entanglement, to process information in fundamentally different ways than classical computers.' },
-      { type: 'text', text: '' },
-      { type: 'text', text: 'Unlike classical bits that are either 0 or 1, quantum bits (qubits) can exist in multiple states simultaneously. This property enables quantum computers to explore many possible solutions at once.' },
-      { type: 'prompt', text: 'What about error correction?' },
-      { type: 'tool', text: 'Quantum error correction is essential because qubits are extremely fragile and prone to decoherence. Current quantum computers have error rates that limit practical applications, but advances in error correction codes and fault-tolerant designs are rapidly improving.' },
+      { type: 'prompt' as const, text: 'Tell me about quantum computing' },
+      { type: 'tool' as const, text: 'Quantum computing is a type of computation that harnesses quantum mechanical phenomena, such as superposition and entanglement, to process information in fundamentally different ways than classical computers.' },
+      { type: 'text' as const, text: '' },
+      { type: 'text' as const, text: 'Unlike classical bits that are either 0 or 1, quantum bits (qubits) can exist in multiple states simultaneously. This property enables quantum computers to explore many possible solutions at once.' },
+      { type: 'prompt' as const, text: 'What about error correction?' },
+      { type: 'tool' as const, text: 'Quantum error correction is essential because qubits are extremely fragile and prone to decoherence. Current quantum computers have error rates that limit practical applications, but advances in error correction codes and fault-tolerant designs are rapidly improving.' },
     ]
     assertFullCoverage(lines, 8, 44, 'real-world chat')
   })
