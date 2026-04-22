@@ -24,3 +24,10 @@
 
 /** Max sessions shown on glasses (most recently active) */
 export const MAX_GLASS_SESSIONS = 10
+
+/**
+ * Scroll overlap — number of lines repeated between consecutive pages.
+ * Provides visual continuity when scrolling through chat so the reader
+ * doesn't lose context. 1-2 lines is enough for the tiny G2 display.
+ */
+export const SCROLL_OVERLAP = 1

@@ -99,15 +99,15 @@ describe('buildMessageScrollTargets', () => {
 
   it('adds pagination targets for long messages', () => {
     // 1 message with 200 chars, maxChars=10 → 20 display lines
-    // viewport = 8
-    // Boundaries: start(0), page(8), page(16)
+    // viewport = 8, SCROLL_OVERLAP = 1 → step = 7
+    // Boundaries: start(0), page(7), page(14)
     // totalLines = 20, maxOffset = 12
-    // Offsets: 20-8-0=12, 20-8-8=4, 20-8-16=-4(filtered)
+    // Offsets: 20-8-0=12, 20-8-7=5, 20-8-14=-2(filtered)
     // Plus offset 0 always included
-    // Result: [0, 4, 12]
+    // Result: [0, 5, 12]
     const lines = [{ type: 'text' as const, text: longText(200) }]
     const result = buildMessageScrollTargets(lines, 8, 10)
-    expect(result).toEqual([0, 4, 12])
+    expect(result).toEqual([0, 5, 12])
   })
 
   it('returns [0] for short messages that fit in viewport', () => {
@@ -122,15 +122,15 @@ describe('buildMessageScrollTargets', () => {
 
   it('pages through very long messages with multiple pagination points', () => {
     // 1 message with 80 chars, maxChars=10 → 8 display lines
-    // viewport = 3
-    // Boundaries: start(0), page(3), page(6)
+    // viewport = 3, SCROLL_OVERLAP = 1 → step = 2
+    // Boundaries: start(0), page(2), page(4), page(6)
     // totalLines = 8, maxOffset = 5
-    // Offsets: 8-3-0=5, 8-3-3=2, 8-3-6=-1(filtered)
+    // Offsets: 8-3-0=5, 8-3-2=3, 8-3-4=1, 8-3-6=-1(filtered)
     // Plus offset 0 always included
-    // Result: [0, 2, 5]
+    // Result: [0, 1, 3, 5]
     const lines = [{ type: 'text' as const, text: longText(80) }]
     const result = buildMessageScrollTargets(lines, 3, 10)
-    expect(result).toEqual([0, 2, 5])
+    expect(result).toEqual([0, 1, 3, 5])
   })
 
   it('handles mixed short and long messages', () => {
@@ -263,25 +263,25 @@ describe('Scroll navigation simulation', () => {
   })
 
   it('pages through long message sequentially', () => {
-    // 1 long message (200 chars at maxChars=10 = 20 lines), viewport=8
-    // targets = [0, 4, 12]
+    // 1 long message (200 chars at maxChars=10 = 20 lines), viewport=8, overlap=1 → step=7
+    // targets = [0, 5, 12]
     const lines = [{ type: 'text' as const, text: longText(200) }]
     const targets = buildMessageScrollTargets(lines, 8, 10)
 
-    // From offset 0 (bottom, auto-scrolled), UP → next > 0 = 4
-    expect(targets.find(t => t > 0)).toBe(4)
+    // From offset 0 (bottom, auto-scrolled), UP → next > 0 = 5
+    expect(targets.find(t => t > 0)).toBe(5)
 
-    // From offset 4, UP → next > 4 = 12
-    expect(targets.find(t => t > 4)).toBe(12)
+    // From offset 5, UP → next > 5 = 12
+    expect(targets.find(t => t > 5)).toBe(12)
 
     // From offset 12, UP → no target > 12 (at top)
     expect(targets.find(t => t > 12)).toBeUndefined()
 
-    // From offset 12, DOWN → next < 12 = 4
-    expect([...targets].reverse().find(t => t < 12)).toBe(4)
+    // From offset 12, DOWN → next < 12 = 5
+    expect([...targets].reverse().find(t => t < 12)).toBe(5)
 
-    // From offset 4, DOWN → next < 4 = 0 (back to bottom)
-    expect([...targets].reverse().find(t => t < 4)).toBe(0)
+    // From offset 5, DOWN → next < 5 = 0 (back to bottom)
+    expect([...targets].reverse().find(t => t < 5)).toBe(0)
 
     // From offset 0, DOWN → no target < 0 (already at bottom)
     expect([...targets].reverse().find(t => t < 0)).toBeUndefined()
@@ -321,19 +321,19 @@ describe('Scroll navigation simulation', () => {
   })
 
   it('covers all display lines for a 20-line message with viewport 8', () => {
-    // 20-line message, viewport=8
+    // 20-line message, viewport=8, SCROLL_OVERLAP=1 → step=7
     const lines = [{ type: 'text' as const, text: longText(20 * 10) }]
     const targets = buildMessageScrollTargets(lines, 8, 10)
 
     // totalLines=20, maxOffset=12
-    // Boundaries: line 0 → offset 12, line 8 → offset 4, line 16 → offset -4 (filtered)
+    // Boundaries: line 0 → offset 12, line 7 → offset 5, line 14 → offset -2 (filtered)
     // Plus offset 0
-    // Result: [0, 4, 12]
-    expect(targets).toEqual([0, 4, 12])
+    // Result: [0, 5, 12]
+    expect(targets).toEqual([0, 5, 12])
 
     // Verify all lines reachable:
     // offset 0: start=12 → shows 12..19
-    // offset 4: start=8 → shows 8..15
+    // offset 5: start=7 → shows 7..14
     // offset 12: start=0 → shows 0..7
     // Lines 0-19 ALL covered!
     const coveredLines = new Set<number>()
@@ -369,5 +369,53 @@ describe('Scroll navigation simulation', () => {
 
     // From 1, DOWN → 0 (back to bottom)
     expect([...targets].reverse().find(t => t < 1)).toBe(0)
+  })
+})
+
+describe('Scroll overlap (Issue #71)', () => {
+  it('consecutive pages share overlap lines for visual continuity', () => {
+    // 16-line message, viewport=8, overlap=1 → step=7
+    // Boundaries: 0, 7, 14
+    // totalLines=16, maxOffset=8
+    // Offsets: 16-8-0=8, 16-8-7=1, 16-8-14=-6(filtered)
+    // Plus offset 0 → [0, 1, 8]
+    const lines = [{ type: 'text' as const, text: longText(16 * 10) }]
+    const targets = buildMessageScrollTargets(lines, 8, 10)
+    expect(targets).toEqual([0, 1, 8])
+
+    // Verify overlap: at offset 8 → start=0 shows lines 0..7
+    // At offset 1 → start=7 shows lines 7..14
+    // Line 7 appears in both pages → visual continuity!
+    const startAtOffset8 = Math.max(0, 16 - 8 - 8)
+    const startAtOffset1 = Math.max(0, 16 - 8 - 1)
+    expect(startAtOffset8).toBe(0) // top page: lines 0-7
+    expect(startAtOffset1).toBe(7) // bottom page: lines 7-14
+    // Line 7 is the overlap
+  })
+
+  it('overlap does not cause gaps in line coverage', () => {
+    // 20-line message with overlap=1, step=7
+    // targets = [0, 5, 12]
+    const lines = [{ type: 'text' as const, text: longText(20 * 10) }]
+    const targets = buildMessageScrollTargets(lines, 8, 10)
+
+    const coveredLines = new Set<number>()
+    for (const offset of targets) {
+      const startLine = Math.max(0, 20 - 8 - offset)
+      for (let i = startLine; i < startLine + 8 && i < 20; i++) {
+        coveredLines.add(i)
+      }
+    }
+    // Every single line must be reachable
+    expect(coveredLines.size).toBe(20)
+
+    // Verify overlap exists: consecutive targets share lines
+    const sortedTargets = [...targets].sort((a, b) => a - b)
+    for (let i = 1; i < sortedTargets.length; i++) {
+      const prevStart = Math.max(0, 20 - 8 - sortedTargets[i - 1])
+      const currStart = Math.max(0, 20 - 8 - sortedTargets[i])
+      // Current page starts before previous page ends → overlap exists
+      expect(currStart).toBeLessThan(prevStart + 8)
+    }
   })
 })

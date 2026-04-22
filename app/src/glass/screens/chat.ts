@@ -2,6 +2,7 @@ import type { GlassScreen } from 'even-toolkit/glass-screen-router'
 import { buildChatDisplay, formatChatLine } from 'even-toolkit/glass-chat-display'
 import { fieldJoin } from 'even-toolkit/glass-format'
 import type { AppSnapshot, AppActions } from '../shared'
+import { SCROLL_OVERLAP } from '../ui-helpers'
 
 /**
  * Chat screen — AI chat display with recording controls.
@@ -61,12 +62,15 @@ export function buildMessageScrollTargets(
     boundaries.add(currentLine) // message start
 
     // Add pagination within long messages.
-    // Step by contentSlots from the message start so each target
-    // shifts the viewport by exactly one page — no gaps in coverage.
-    let pageLine = contentSlots
+    // Step by (contentSlots - SCROLL_OVERLAP) from the message start so
+    // consecutive pages share SCROLL_OVERLAP lines of content — this
+    // provides visual continuity (the reader sees the last line of the
+    // previous page at the top of the new page).
+    const step = contentSlots - SCROLL_OVERLAP
+    let pageLine = step
     while (currentLine + pageLine < currentLine + lineCount) {
       boundaries.add(currentLine + pageLine)
-      pageLine += contentSlots
+      pageLine += step
     }
 
     currentLine += lineCount
