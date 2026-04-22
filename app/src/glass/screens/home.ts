@@ -23,7 +23,7 @@ const MENU_ITEMS = ['New Session', 'Sessions'] as const
  */
 export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
   display(snapshot, nav) {
-    const headerStatus = snapshot.connected ? 'Connected' : 'Disconnected'
+    const headerStatus = snapshot.connected ? 'Connected' : snapshot.isReconnecting ? 'Reconnecting...' : 'Disconnected'
     const title = fieldJoin('Caduceus', headerStatus)
 
     // When disconnected, show setup instructions instead of menu
@@ -31,11 +31,21 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
       const lines = [
         { text: title, inverted: false, style: 'normal' as const },
         { text: '', inverted: false, style: 'separator' as const },
-        { text: 'Bridge unreachable.', inverted: false, style: 'normal' as const },
-        { text: '', inverted: false, style: 'normal' as const },
-        { text: '1. Open Caduceus on phone', inverted: false, style: 'normal' as const },
-        { text: '2. Check bridge URL', inverted: false, style: 'normal' as const },
-        { text: '3. Ensure bridge is running', inverted: false, style: 'normal' as const },
+        // Show reconnection status with a progress hint
+        ...(snapshot.isReconnecting
+          ? [
+              { text: 'Checking bridge...', inverted: false, style: 'normal' as const },
+              { text: '', inverted: false, style: 'normal' as const },
+              { text: 'Will reconnect when', inverted: false, style: 'normal' as const },
+              { text: 'bridge is available.', inverted: false, style: 'normal' as const },
+            ]
+          : [
+              { text: 'Bridge unreachable.', inverted: false, style: 'normal' as const },
+              { text: '', inverted: false, style: 'normal' as const },
+              { text: '1. Open Caduceus on phone', inverted: false, style: 'normal' as const },
+              { text: '2. Check bridge URL', inverted: false, style: 'normal' as const },
+              { text: '3. Ensure bridge is running', inverted: false, style: 'normal' as const },
+            ]),
         { text: '', inverted: false, style: 'normal' as const },
         { text: 'gitlab.com/Qu4ndo/g2-caduceus', inverted: false, style: 'normal' as const },
       ]

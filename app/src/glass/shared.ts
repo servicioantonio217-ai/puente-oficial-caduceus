@@ -15,6 +15,8 @@ export type ScreenName = 'splash' | 'home' | 'sessions' | 'chat'
 export interface AppSnapshot {
   screen: ScreenName
   connected: boolean
+  /** True when the app is actively polling for bridge recovery. */
+  isReconnecting: boolean
   sessions: Session[]
   currentSession: Session | null
   chatLines: ChatLine[]

@@ -49,6 +49,8 @@ interface AppContextValue {
   /** Effective agent timeout in ms (bridge-reported or user override). */
   agentTimeoutMs: number
   connected: boolean
+  /** True when the app is disconnected and actively polling for bridge recovery. */
+  isReconnecting: boolean
   sessions: Session[]
   currentSession: Session | null
   messages: ChatMessage[]
@@ -134,6 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recordingSettings, setRecordingSettingsState] = useState<RecordingSettings>(loadRecordingSettings)
   const [agentTimeoutSettings, setAgentTimeoutSettingsState] = useState<AgentTimeoutSettings>(loadAgentTimeoutSettings)
   const [connected, setConnected] = useState(false)
+  const [isReconnecting, setIsReconnecting] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -581,6 +584,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Automatic reconnection when disconnected ──────────────────────
+  // When the bridge becomes unreachable, periodically poll /health
+  // with exponential backoff (10s → 20s → 30s → 30s…). On success,
+  // restore the full connection state via the existing connect() flow.
+  // The interval stops as soon as the app reconnects.
+  useEffect(() => {
+    // Only activate when: disconnected AND we have credentials to retry
+    if (connected || !config.url || !config.token) {
+      setIsReconnecting(false)
+      return
+    }
+
+    setIsReconnecting(true)
+
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    let attempt = 0
+
+    // Backoff schedule: 10s, 20s, 30s, 30s, 30s, …
+    const BACKOFF_CAP_MS = 30_000
+    function getDelay(): number {
+      const base = Math.min(BACKOFF_CAP_MS, 10_000 * (attempt + 1))
+      attempt++
+      return base
+    }
+
+    function poll() {
+      if (cancelled) return
+      timer = setTimeout(async () => {
+        if (cancelled) return
+        try {
+          const result = await api.healthCheck(configRef.current)
+          if (cancelled) return
+          if (result.ok) {
+            // Bridge is back — restore full state
+            setConnected(true)
+            setBridgeTimeoutMs(result.agentTimeoutMs)
+            setIsReconnecting(false)
+            const list = await api.listSessions(configRef.current)
+            if (!cancelled) setSessions(list)
+            return
+          }
+          // Still down — schedule next attempt
+          poll()
+        } catch {
+          // Network error — schedule next attempt
+          poll()
+        }
+      }, getDelay())
+    }
+
+    poll()
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+      setIsReconnecting(false)
+    }
+  }, [connected, config.url, config.token]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <AppContext.Provider
       value={{
@@ -588,7 +651,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         recordingSettings, setRecordingSettings,
         agentTimeoutSettings, setAgentTimeoutSettings,
         agentTimeoutMs,
-        connected, sessions,
+        connected, isReconnecting, sessions,
         currentSession, messages,
         isLoading, isRecording, error,
         connect, disconnect,
