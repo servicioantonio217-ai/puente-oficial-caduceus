@@ -20,6 +20,7 @@ from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
 from g2_bridge.models import AgentResponse, SendMessageRequest
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/sessions", tags=["messages"])
@@ -136,7 +137,7 @@ async def send_message(
         # Store assistant message (full, untruncated — glasses handle display via scroll)
         await db.add_message(str(uuid.uuid4()), session_id, "assistant", response_text, now)
 
-    # Return full response to client (smartphone gets full text, glasses scroll via buildChatDisplay)
+    # Return full response — smartphone gets full text, glasses scroll
     if agent_response.output:
         full_output = agent_response.output.copy()
         for msg in full_output:

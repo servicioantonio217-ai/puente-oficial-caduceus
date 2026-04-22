@@ -209,7 +209,7 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Str
             # Store assistant message (full, untruncated — glasses handle display via scroll)
             await db.add_message(str(uuid.uuid4()), session_id, "assistant", response_text, now)
 
-        # Return full response to client (smartphone gets full text, glasses scroll via buildChatDisplay)
+        # Return full response — smartphone gets full text, glasses scroll
         if agent_response.output:
             full_output = agent_response.output.copy()
             for msg in full_output:
