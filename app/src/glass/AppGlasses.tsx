@@ -18,7 +18,7 @@ import { normalizeChatLines } from './normalize-chat-lines'
  */
 export function AppGlasses() {
   const {
-    connected, sessions, currentSession, messages,
+    connected, isReconnecting, sessions, currentSession, messages,
     isLoading, isRecording, error,
     newSession, openSession, closeSession, sendText, startRecording, stopRecording,
     cancelRecording,
@@ -58,6 +58,7 @@ export function AppGlasses() {
   const snapshot: AppSnapshot = {
     screen: deriveScreenName(),
     connected,
+    isReconnecting,
     sessions: sortedSessions,
     currentSession,
     chatLines,
