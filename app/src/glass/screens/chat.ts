@@ -96,9 +96,10 @@ export const chatScreen: GlassScreen<AppSnapshot, AppActions> = {
     // - "Idle" = connected, no action in progress
     // - "Recording" = active recording
     // - "Thinking" = processing AI response
-    // - "Offline" = no connection
+    // - "Reconnecting..." = disconnected, auto-reconnect polling
+    // - "Offline" = no connection, no credentials to retry
     let actionLabel: string
-    if (!snapshot.connected) actionLabel = 'Offline'
+    if (!snapshot.connected) actionLabel = snapshot.isReconnecting ? 'Reconnecting...' : 'Offline'
     else if (snapshot.isRecording) actionLabel = 'Recording'
     else if (snapshot.isProcessing) actionLabel = 'Thinking'
     else actionLabel = 'Idle'

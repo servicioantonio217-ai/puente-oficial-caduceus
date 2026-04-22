@@ -49,6 +49,8 @@ interface AppContextValue {
   /** Effective agent timeout in ms (bridge-reported or user override). */
   agentTimeoutMs: number
   connected: boolean
+  /** True when disconnected and actively polling for bridge recovery. */
+  isReconnecting: boolean
   sessions: Session[]
   currentSession: Session | null
   messages: ChatMessage[]
@@ -134,6 +136,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recordingSettings, setRecordingSettingsState] = useState<RecordingSettings>(loadRecordingSettings)
   const [agentTimeoutSettings, setAgentTimeoutSettingsState] = useState<AgentTimeoutSettings>(loadAgentTimeoutSettings)
   const [connected, setConnected] = useState(false)
+  const [isReconnecting, setIsReconnecting] = useState(false)
+  // Tracks user intent: true after connect(), false after disconnect().
+  // Ref (not state) because it controls side-effect logic only — never rendered.
+  const wantsConnectionRef = useRef(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -188,6 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const connect = useCallback(async () => {
     const c = configRef.current
     if (!c.url || !c.token) return
+    wantsConnectionRef.current = true
     setError(null)
     try {
       const result = await api.healthCheck(c)
@@ -204,6 +211,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const disconnect = useCallback(() => {
+    wantsConnectionRef.current = false
     setConnected(false)
     setSessions([])
     setCurrentSession(null)
@@ -546,6 +554,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // Auto-connect with whatever config is now available
         if (effectiveConfig.url && effectiveConfig.token) {
+          wantsConnectionRef.current = true
           api.healthCheck(effectiveConfig).then((result) => {
             if (cancelled) return
             setConnected(result.ok)
@@ -561,6 +570,107 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ).catch(() => { /* bridge unavailable — localStorage values already in use */ })
     return () => { cancelled = true }
   }, [])
+
+  // ── Unified connection lifecycle ──────────────────────────────────
+  // Single state machine that handles:
+  //   CONNECTED   → periodic health monitoring (30s), detect silent drops
+  //   DISCONNECTED → backoff reconnection (10s → 20s → 30s cap) when user wants it
+  //   IDLE        → no polling (manual disconnect or no credentials)
+  //
+  // Previous approach (MR !127) used two separate useEffects communicating
+  // via `connected` state and `wantsConnection` as React state — fragile and
+  // prone to flapping. This single effect makes the lifecycle explicit:
+  //   connected=true            → monitoring phase
+  //   connected=false, wants=true → reconnection phase
+  //   connected=false, wants=false → idle (no timers)
+  useEffect(() => {
+    const hasCredentials = !!(config.url && config.token)
+    if (!hasCredentials) return
+
+    let cancelled = false
+
+    if (connected) {
+      // ── MONITORING: periodic health check while connected ──
+      // Detects silent connection drops (bridge crash, network change, etc.)
+      const MONITOR_INTERVAL_MS = 30_000
+      const timer = setInterval(async () => {
+        if (cancelled) return
+        try {
+          const result = await api.healthCheck(configRef.current)
+          if (cancelled) return
+          if (!result.ok) {
+            setConnected(false) // triggers reconnection phase via effect re-run
+          }
+        } catch {
+          if (!cancelled) setConnected(false)
+        }
+      }, MONITOR_INTERVAL_MS)
+
+      return () => { cancelled = true; clearInterval(timer) }
+    }
+
+    if (wantsConnectionRef.current) {
+      // ── RECONNECTION: backoff poll when unexpectedly disconnected ──
+      // Checks `wantsConnectionRef` before each attempt so manual disconnect
+      // cancels an in-flight reconnection without needing the effect to re-run.
+      setIsReconnecting(true)
+      let attempt = 0
+      let timer: ReturnType<typeof setTimeout>
+
+      function schedulePoll(): void {
+        if (cancelled || !wantsConnectionRef.current) {
+          if (!cancelled) setIsReconnecting(false)
+          return
+        }
+
+        // Exponential backoff: 10s, 20s, 30s, 30s, ...
+        const BASE_MS = 10_000
+        const CAP_MS = 30_000
+        const delay = Math.min(CAP_MS, BASE_MS * Math.pow(2, attempt))
+        attempt++
+
+        timer = setTimeout(async () => {
+          if (cancelled || !wantsConnectionRef.current) {
+            if (!cancelled) setIsReconnecting(false)
+            return
+          }
+
+          try {
+            const result = await api.healthCheck(configRef.current)
+            if (cancelled || !wantsConnectionRef.current) {
+              if (!cancelled) setIsReconnecting(false)
+              return
+            }
+
+            if (result.ok) {
+              // Bridge is back — restore full state
+              setConnected(true)
+              setBridgeTimeoutMs(result.agentTimeoutMs)
+              setIsReconnecting(false)
+              setError(null)
+              const list = await api.listSessions(configRef.current)
+              if (!cancelled) setSessions(list)
+              return // effect re-runs with connected=true → monitoring phase
+            }
+            // Still down — schedule next attempt
+          } catch {
+            // Network error — schedule next attempt
+          }
+          schedulePoll()
+        }, delay)
+      }
+
+      schedulePoll()
+
+      return () => {
+        cancelled = true
+        clearTimeout(timer)
+        setIsReconnecting(false)
+      }
+    }
+
+    return undefined
+  }, [connected, config.url, config.token])
 
   // Foreground/background lifecycle: keep-alive, cleanup recording, reconnect
   useEffect(() => {
@@ -588,7 +698,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         recordingSettings, setRecordingSettings,
         agentTimeoutSettings, setAgentTimeoutSettings,
         agentTimeoutMs,
-        connected, sessions,
+        connected, isReconnecting, sessions,
         currentSession, messages,
         isLoading, isRecording, error,
         connect, disconnect,
