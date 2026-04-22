@@ -56,7 +56,25 @@ export const homeScreen: GlassScreen<AppSnapshot, AppActions> = {
     return { lines }
   },
 
-  action(action, nav, _snapshot, ctx) {
+  action(action, nav, snapshot, ctx) {
+    // When disconnected, block all navigation actions.
+    // The disconnected display shows setup instructions (no menu items),
+    // so there is nothing valid to select. Highlight moves are allowed but
+    // clamped to 0 (single-page instructions). This prevents the user from
+    // navigating into Sessions or Chat screens which are non-functional offline.
+    // See issue #72: Block navigation when bridge is disconnected.
+    if (!snapshot.connected) {
+      if (action.type === 'SELECT_HIGHLIGHTED') {
+        console.log('[Home] SELECT_HIGHLIGHTED blocked — bridge disconnected')
+        return nav
+      }
+      // Allow HIGHLIGHT_MOVE but keep highlight at 0 (no interactive items)
+      if (action.type === 'HIGHLIGHT_MOVE') {
+        return nav
+      }
+      return nav
+    }
+
     if (action.type === 'HIGHLIGHT_MOVE') {
       return {
         ...nav,
