@@ -58,7 +58,7 @@ async def summarize(text: str, settings: Settings) -> str | None:
             resp.raise_for_status()
 
         data = resp.json()
-        summary = data["choices"][0]["message"]["content"].strip()
+        summary = str(data["choices"][0]["message"]["content"]).strip()
 
         if not summary:
             logger.warning("Summarization returned empty text")
