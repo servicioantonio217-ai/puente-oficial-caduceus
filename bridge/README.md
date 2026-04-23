@@ -41,6 +41,13 @@ G2_AGENT_API_URL=http://localhost:<agent-port>/v1
 G2_STT_API_URL=http://<stt-host>:<stt-port>/v1/audio/transcriptions
 G2_STT_API_KEY=***
 
+# Optional — response adaptation for glasses display
+# G2_RESPONSE_MODE=full          # full (default) | summarize | truncate
+# G2_SUMMARIZE_ENDPOINT=http://localhost:4000/v1/chat/completions
+# G2_SUMMARIZE_MODEL=gemma-3-4b
+# G2_SUMMARIZE_API_KEY=
+# G2_SUMMARY_MAX_CHARS=300
+
 # Optional — see Configuration Reference below for all options
 ```
 
@@ -123,7 +130,12 @@ All settings use environment variables with the `G2_` prefix. They can also be s
 | `G2_STT_API_KEY` | *(empty)* | STT endpoint API key. Optional — only needed if your STT provider requires authentication. |
 | `G2_STT_MODEL` | `whisper-1` | Model name sent to the STT endpoint in the `model` field. Override if your provider uses a different model identifier. |
 | `G2_DATABASE_PATH` | `/data/g2_bridge.db` | SQLite database file path. Parent directory is auto-created. |
-| `G2_MAX_RESPONSE_CHARS` | `500` | Maximum characters for agent response truncation. Responses exceeding this are cut at a sentence boundary with `...` appended. |
+| `G2_MAX_RESPONSE_CHARS` | `500` | Maximum characters for agent response truncation (used in `truncate` mode). Responses exceeding this are cut at a sentence boundary with `...` appended. |
+| `G2_RESPONSE_MODE` | `full` | How to adapt agent responses for the glasses display. See [Response Adaptation](#response-adaptation) for details. |
+| `G2_SUMMARIZE_ENDPOINT` | *(empty)* | OpenAI-compatible chat completion URL for summarization (e.g., `http://10.2.0.12:4000/v1/chat/completions`). Required when `G2_RESPONSE_MODE=summarize`. |
+| `G2_SUMMARIZE_MODEL` | *(empty)* | Model name for the summarization LLM (e.g., `gemma-3-4b`). Required when `G2_RESPONSE_MODE=summarize`. |
+| `G2_SUMMARIZE_API_KEY` | *(empty)* | API key for the summarization endpoint. Optional — local LiteLLM proxies may not require authentication. |
+| `G2_SUMMARY_MAX_CHARS` | `300` | Target maximum length for the LLM-generated summary (in characters). Used as `max_tokens` in the summarization request. |
 | `G2_MAX_SESSIONS` | `100` | Max sessions before auto-eviction of oldest (LRU). Set to `0` for unlimited. |
 | `G2_MAX_AUDIO_BYTES` | `5242880` (5 MB) | Maximum audio file size accepted by the audio endpoint. Larger files return 413. |
 | `G2_MAX_CONTEXT_MESSAGES` | `50` | Maximum number of prior messages sent to the agent as conversation context. Prevents token overflow. |
@@ -312,8 +324,9 @@ Content-Type: application/json
 The bridge:
 1. Loads conversation history from the database (up to `G2_MAX_CONTEXT_MESSAGES` prior messages)
 2. Sends the message + history to the AI agent via the Chat Completions API
-3. Stores both the user message and the (truncated) assistant response
-4. Returns the agent's response in OpenAI Responses API format
+3. Stores both the user message and the full (untruncated) assistant response
+4. Applies response adaptation based on `G2_RESPONSE_MODE` (full/summarize/truncate)
+5. Returns the agent's response with `full_text` and `display_text` fields
 
 **Response:** `AgentResponse` — see below.
 
@@ -367,16 +380,64 @@ Common error codes:
 
 ## Response Adaptation
 
-Agent responses are truncated to fit the G2 display constraints. The truncation algorithm:
+The bridge can adapt agent responses for the G2 glasses display while preserving the full response for the smartphone. This is controlled by `G2_RESPONSE_MODE`:
 
-1. If the response fits within `G2_MAX_RESPONSE_CHARS` (default 500), it's returned as-is
-2. Otherwise, find the last sentence boundary (`.`, `!`, `?` followed by a space) within the limit
-3. If no sentence boundary is found, cut at the last word boundary
-4. Append `...` to indicate truncation
+### Modes
 
-Both the stored message and the API response contain the truncated version. The original full response from the agent is not preserved.
+| Mode | Glasses receive | Smartphone receives | Description |
+|------|----------------|--------------------:|-------------|
+| `full` (default) | Full response (scroll) | Full response | No processing — both clients get the same text |
+| `summarize` | LLM-generated summary | Full response | An extra LLM call produces a compact summary for the glasses |
+| `truncate` | Hard character cutoff | Full response | Legacy behavior — cuts at sentence boundary with `...` |
 
-The `summarize` mode mentioned in the architecture docs is **not yet implemented** — all responses use truncation.
+### Architecture
+
+```
+Agent → Bridge stores full response
+      ├→ Smartphone: receives full_text (original, unmodified)
+      └→ If response_mode == "summarize":
+            Bridge calls Summarize-Endpoint → summary_text
+            Glasses receive summary_text
+         Elif response_mode == "truncate":
+            Glasses receive truncated text (G2_MAX_RESPONSE_CHARS)
+         Else ("full"):
+            Glasses receive full_text (scroll handles display)
+```
+
+The API response includes both fields:
+
+```json
+{
+  "output": [...],
+  "full_text": "The complete, unmodified agent response...",
+  "display_text": "Short summary for glasses."
+}
+```
+
+- `full_text` — original agent response (for smartphone WebUI)
+- `display_text` — adapted text for glasses (summary, truncated, or same as full_text)
+
+Both fields are optional (`null` when `response_mode=full` and no adaptation is needed). The phone app uses `full_text` for the chat view; the glasses rendering layer uses `display_text` when available, falling back to `full_text`.
+
+### Summarization Setup
+
+To enable LLM-based summarization:
+
+1. Set `G2_RESPONSE_MODE=summarize`
+2. Configure the summarization endpoint:
+   ```bash
+   G2_SUMMARIZE_ENDPOINT=http://10.2.0.12:4000/v1/chat/completions
+   G2_SUMMARIZE_MODEL=gemma-3-4b
+   G2_SUMMARIZE_API_KEY=optional-key    # often not needed for local LiteLLM
+   G2_SUMMARY_MAX_CHARS=300              # target summary length
+   ```
+3. The endpoint must be OpenAI Chat Completions compatible — a [LiteLLM proxy](https://github.com/BerriAI/litellm) works well with any local model.
+
+**Cost:** Each agent response triggers one additional LLM call (~500-2000 input tokens + ~100-200 output tokens). With a small local model (e.g., gemma-3-4b), cost is negligible. External APIs: ~$0.0001-0.001 per summary.
+
+**Latency:** The summarization call runs synchronously after the agent responds, adding ~1-2s with a local model. If the call fails (timeout, error), the bridge falls back to the full text — responses are never blocked.
+
+**System prompt:** The bridge sends a predefined prompt instructing the model to summarize for a tiny screen (~8 lines, ~44 chars per line), keeping key facts and removing filler. Output is plain text.
 
 ## Speech-to-Text (STT) Configuration
 
@@ -421,6 +482,8 @@ bridge/
 │   ├── stt_client.py        # STT HTTP client (Whisper API)
 │   ├── context.py           # Conversation history builder
 │   ├── response.py          # Response truncation for G2 display
+│   ├── response_adapter.py  # Mode-based response adaptation (full/summarize/truncate)
+│   ├── summarize.py         # LLM summarization client for glasses display
 │   └── routers/
 │       ├── health.py        # GET /health
 │       ├── sessions.py      # CRUD + bulk-delete + rename

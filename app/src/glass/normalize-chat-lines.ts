@@ -30,7 +30,7 @@ import type { ChatLine } from 'even-toolkit/glass-chat-display'
  * @returns Array of ChatLines with newlines expanded
  */
 export function normalizeChatLines(
-  messages: Array<{ role: string; content: string }>,
+  messages: Array<{ role: string; content: string; displayText?: string }>,
   error?: string | null,
   isLoading?: boolean,
   isRecording?: boolean,
@@ -38,8 +38,9 @@ export function normalizeChatLines(
   const lines: ChatLine[] = []
 
   for (const msg of messages) {
-    // Runtime guard: treat null/undefined content as empty string
-    const rawContent = msg.content ?? ''
+    // Use displayText for glasses when available (issue #75),
+    // otherwise fall back to full content.
+    const rawContent = msg.displayText ?? msg.content ?? ''
     // Normalize newlines: CRLF (\r\n) and CR (\r) → LF (\n)
     const normalizedContent = rawContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
     // Split content on newlines - each segment becomes its own ChatLine

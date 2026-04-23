@@ -130,6 +130,13 @@ class AgentResponse(BaseModel):
     output: list[OutputMessage] = []
     usage: dict[str, Any] = Field(default_factory=lambda: {"input_tokens": 0, "output_tokens": 0})
 
+    # Dual-text fields for glasses/smartphone display split (issue #75).
+    # full_text = original agent response (for smartphone).
+    # display_text = summary or truncation for glasses (same as full_text in "full" mode).
+    # Both are optional for backwards compatibility — old clients ignore them.
+    full_text: str | None = None
+    display_text: str | None = None
+
 
 class HealthResponse(BaseModel):
     status: str = "ok"
