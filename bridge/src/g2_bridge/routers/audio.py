@@ -21,8 +21,8 @@ from g2_bridge.auth import (
 from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
-from g2_bridge.stt_client import STTClient
 from g2_bridge.response_adapter import adapt_response
+from g2_bridge.stt_client import STTClient
 
 logger = logging.getLogger(__name__)
 
