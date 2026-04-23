@@ -415,7 +415,7 @@ describe('Scroll indicator coverage (Issue #71)', () => {
     chatLines: Array<{ type: 'text' | 'prompt' | 'tool' | 'error' | 'system'; text: string }>,
     contentSlots: number,
     maxChars: number,
-    label: string,
+    _label: string,
   ) {
     const targets = buildMessageScrollTargets(chatLines, contentSlots, maxChars)
 
