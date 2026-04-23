@@ -72,10 +72,16 @@ async def summarize(text: str, settings: Settings) -> str | None:
         return summary
 
     except httpx.TimeoutException:
-        logger.warning("Summarization timed out (%.1fs) — falling back to full text", _SUMMARIZE_TIMEOUT_S)
+        logger.warning(
+            "Summarization timed out (%.1fs) — falling back to full text",
+            _SUMMARIZE_TIMEOUT_S,
+        )
         return None
     except httpx.HTTPStatusError as e:
-        logger.warning("Summarization HTTP error %d — falling back to full text", e.response.status_code)
+        logger.warning(
+            "Summarization HTTP error %d — falling back to full text",
+            e.response.status_code,
+        )
         return None
     except Exception as e:
         logger.warning("Summarization failed: %s — falling back to full text", e)
