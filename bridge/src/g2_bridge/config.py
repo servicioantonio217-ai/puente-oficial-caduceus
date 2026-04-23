@@ -58,6 +58,21 @@ class Settings(BaseSettings):
     max_response_chars: int = 500  # G2_MAX_RESPONSE_CHARS
     max_audio_bytes: int = 5 * 1024 * 1024  # G2_MAX_AUDIO_BYTES — 5 MB limit
 
+    # Response mode: how to adapt agent responses for the glasses display.
+    # "full" = no processing, both clients get full response (glasses use scroll)
+    # "summarize" = LLM summarizes for glasses, smartphone gets full text
+    # "truncate" = hard char cutoff (legacy behavior)
+    response_mode: str = "full"  # G2_RESPONSE_MODE
+
+    # Summarization endpoint (OpenAI-compatible chat completion URL)
+    summarize_endpoint: str = ""  # G2_SUMMARIZE_ENDPOINT
+    # Model name for summarization (e.g. gemma-3-4b, llama-3-8b via LiteLLM)
+    summarize_model: str = ""  # G2_SUMMARIZE_MODEL
+    # API key for the endpoint (optional, may not be needed for local LiteLLM)
+    summarize_api_key: str = ""  # G2_SUMMARIZE_API_KEY
+    # Target max length for summary in characters
+    summary_max_chars: int = 300  # G2_SUMMARY_MAX_CHARS
+
     # Session management
     max_sessions: int = 100  # G2_MAX_SESSIONS — max sessions before auto-eviction of oldest
 
@@ -80,6 +95,10 @@ class Settings(BaseSettings):
         if self.log_format not in ("text", "json"):
             msg = f"Invalid log format: {self.log_format!r}. Must be 'text' or 'json'"
             raise ValueError(msg)
+        valid_modes = ("full", "summarize", "truncate")
+        if self.response_mode not in valid_modes:
+            msg = f"Invalid response mode: {self.response_mode!r}. Must be one of {valid_modes}"
+            raise ValueError(msg)
 
     @property
     def is_configured(self) -> bool:
@@ -90,6 +109,11 @@ class Settings(BaseSettings):
     def stt_configured(self) -> bool:
         """Check if STT endpoint is configured."""
         return bool(self.stt_api_url)
+
+    @property
+    def summarize_configured(self) -> bool:
+        """Check if summarization endpoint is configured."""
+        return bool(self.summarize_endpoint and self.summarize_model)
 
     def convert_utc_to_local(self, utc_iso: str) -> str:
         """Convert a UTC ISO timestamp to the configured local timezone.

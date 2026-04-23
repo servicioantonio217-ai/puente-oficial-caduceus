@@ -12,6 +12,8 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** Summarized/truncated text for glasses display (issue #75). Falls back to content. */
+  displayText?: string
   created_at: string
 }
 
@@ -22,6 +24,10 @@ export interface AgentResponse {
   conversation: string
   output: AgentOutputItem[]
   usage?: { input_tokens: number; output_tokens: number }
+  /** Original agent response text (for smartphone). */
+  full_text?: string
+  /** Adapted text for glasses display (summary or truncation). */
+  display_text?: string
 }
 
 export interface AgentOutputItem {

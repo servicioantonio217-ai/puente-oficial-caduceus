@@ -25,7 +25,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design document.
 - **Voice input** — Double-tap glasses to record, VAD detects end of speech, STT on the bridge
 - **Text chat** — Type messages via the phone companion WebUI
 - **Session management** — Create, browse, resume, rename, and delete chat sessions
-- **Response adaptation** — Truncate or summarize AI responses for G2 display constraints
+- **Response adaptation** — Optional LLM-based summarization or truncation for G2 display; smartphone always shows full responses
 - **Phone companion** — Settings and extended chat view in the Even Realities App WebUI
 - **Minimal glasses UI** — Per-screen routing (home → sessions → chat) with touchpad navigation
 

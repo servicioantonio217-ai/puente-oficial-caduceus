@@ -20,6 +20,7 @@ from g2_bridge.context import build_history
 from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
 from g2_bridge.models import AgentResponse, SendMessageRequest
+from g2_bridge.response_adapter import adapt_response
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,10 @@ async def send_message(
         # Store assistant message (full, untruncated — glasses handle display via scroll)
         await db.add_message(str(uuid.uuid4()), session_id, "assistant", response_text, now)
 
-    # Return full response — smartphone gets full text, glasses scroll
+    # Adapt response for glasses display based on response_mode
+    full_text, display_text = await adapt_response(response_text, settings)
+
+    # Return full response — smartphone gets full text, glasses get display_text
     if agent_response.output:
         full_output = agent_response.output.copy()
         for msg in full_output:
@@ -145,4 +149,6 @@ async def send_message(
         agent_response.output = full_output
 
     agent_response.conversation = session_id
+    agent_response.full_text = full_text
+    agent_response.display_text = display_text
     return agent_response

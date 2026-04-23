@@ -359,7 +359,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const assistantMsg: ChatMessage = {
         id: response.id ?? uuid(),
         role: 'assistant',
-        content: assistantText,
+        content: response.full_text ?? assistantText,
+        displayText: response.display_text,
         created_at: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, assistantMsg])
@@ -446,7 +447,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const assistantMsg: ChatMessage = {
             id: result.response.id ?? uuid(),
             role: 'assistant',
-            content: assistantText,
+            content: result.response.full_text ?? assistantText,
+            displayText: result.response.display_text,
             created_at: new Date().toISOString(),
           }
           setMessages((prev) => [...prev, assistantMsg])
