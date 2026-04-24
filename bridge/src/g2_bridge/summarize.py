@@ -30,7 +30,7 @@ async def summarize(text: str, settings: Settings) -> str | None:
     (timeout, HTTP error, empty response). The caller should fall back
     to the full text when None is returned.
     """
-    if not settings.summarize_endpoint or not settings.summarize_model:
+    if not settings.summarize_api_url or not settings.summarize_model:
         logger.warning("Summarization requested but endpoint/model not configured")
         return None
 
@@ -44,14 +44,14 @@ async def summarize(text: str, settings: Settings) -> str | None:
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": text},
         ],
-        "max_tokens": settings.summary_max_chars,
+        "max_tokens": settings.max_summary_chars,
         "temperature": 0.3,
     }
 
     try:
         async with httpx.AsyncClient(timeout=_SUMMARIZE_TIMEOUT_S) as client:
             resp = await client.post(
-                settings.summarize_endpoint,
+                settings.summarize_api_url,
                 json=payload,
                 headers=headers,
             )

@@ -14,10 +14,10 @@ def _make_settings(mode: str = "full") -> MagicMock:
     settings = MagicMock()
     settings.response_mode = mode
     settings.max_response_chars = 100
-    settings.summarize_endpoint = "http://localhost:4000/v1/chat/completions"
+    settings.summarize_api_url = "http://localhost:4000/v1/chat/completions"
     settings.summarize_model = "gemma-3-4b"
     settings.summarize_api_key = "key"
-    settings.summary_max_chars = 300
+    settings.max_summary_chars = 300
     return settings
 
 
