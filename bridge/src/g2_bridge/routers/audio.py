@@ -23,6 +23,7 @@ from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
 from g2_bridge.response_adapter import adapt_response
 from g2_bridge.stt_client import STTClient
+from g2_bridge.summarize import generate_title
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,15 @@ async def send_audio(request: Request, session_id: str, file: UploadFile) -> Str
     user_msg_id = str(uuid.uuid4())
     await db.add_message(user_msg_id, session_id, "user", transcript, now)
     await db.update_session_timestamp(session_id, now)
+
+    # Auto-generate session title from first message (issue #76).
+    # Runs outside the lock — rename_session doesn't touch updated_at
+    # and doesn't conflict with the agent call inside the lock.
+    if not session["name"]:
+        title = await generate_title(transcript, settings)
+        if title:
+            await db.rename_session(session_id, title)
+            session["name"] = title
 
     async def stream() -> AsyncIterator[str]:
         """SSE stream: transcript first, then agent response."""
