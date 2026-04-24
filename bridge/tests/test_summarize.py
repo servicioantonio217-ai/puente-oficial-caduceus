@@ -18,10 +18,10 @@ def _make_settings(
 ) -> MagicMock:
     """Create a mock Settings object with summarization config."""
     settings = MagicMock()
-    settings.summarize_endpoint = endpoint
+    settings.summarize_api_url = endpoint
     settings.summarize_model = model
     settings.summarize_api_key = api_key
-    settings.summary_max_chars = max_chars
+    settings.max_summary_chars = max_chars
     return settings
 
 

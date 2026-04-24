@@ -65,13 +65,13 @@ class Settings(BaseSettings):
     response_mode: str = "full"  # G2_RESPONSE_MODE
 
     # Summarization endpoint (OpenAI-compatible chat completion URL)
-    summarize_endpoint: str = ""  # G2_SUMMARIZE_ENDPOINT
+    summarize_api_url: str = ""  # G2_SUMMARIZE_API_URL
     # Model name for summarization (e.g. gemma-3-4b, llama-3-8b via LiteLLM)
     summarize_model: str = ""  # G2_SUMMARIZE_MODEL
     # API key for the endpoint (optional, may not be needed for local LiteLLM)
     summarize_api_key: str = ""  # G2_SUMMARIZE_API_KEY
     # Target max length for summary in characters
-    summary_max_chars: int = 300  # G2_SUMMARY_MAX_CHARS
+    max_summary_chars: int = 300  # G2_MAX_SUMMARY_CHARS
 
     # Session management
     max_sessions: int = 100  # G2_MAX_SESSIONS — max sessions before auto-eviction of oldest
@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     @property
     def summarize_configured(self) -> bool:
         """Check if summarization endpoint is configured."""
-        return bool(self.summarize_endpoint and self.summarize_model)
+        return bool(self.summarize_api_url and self.summarize_model)
 
     def convert_utc_to_local(self, utc_iso: str) -> str:
         """Convert a UTC ISO timestamp to the configured local timezone.

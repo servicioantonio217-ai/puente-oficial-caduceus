@@ -43,10 +43,10 @@ G2_STT_API_KEY=***
 
 # Optional — response adaptation for glasses display
 # G2_RESPONSE_MODE=full          # full (default) | summarize | truncate
-# G2_SUMMARIZE_ENDPOINT=http://localhost:4000/v1/chat/completions
+# G2_SUMMARIZE_API_URL=http://localhost:4000/v1/chat/completions
 # G2_SUMMARIZE_MODEL=gemma-3-4b
-# G2_SUMMARIZE_API_KEY=
-# G2_SUMMARY_MAX_CHARS=300
+# G2_SUMMARIZE_API_KEY=***
+# G2_MAX_SUMMARY_CHARS=300
 
 # Optional — see Configuration Reference below for all options
 ```
@@ -132,10 +132,10 @@ All settings use environment variables with the `G2_` prefix. They can also be s
 | `G2_DATABASE_PATH` | `/data/g2_bridge.db` | SQLite database file path. Parent directory is auto-created. |
 | `G2_MAX_RESPONSE_CHARS` | `500` | Maximum characters for agent response truncation (used in `truncate` mode). Responses exceeding this are cut at a sentence boundary with `...` appended. |
 | `G2_RESPONSE_MODE` | `full` | How to adapt agent responses for the glasses display. See [Response Adaptation](#response-adaptation) for details. |
-| `G2_SUMMARIZE_ENDPOINT` | *(empty)* | OpenAI-compatible chat completion URL for summarization (e.g., `http://10.2.0.12:4000/v1/chat/completions`). Required when `G2_RESPONSE_MODE=summarize`. |
+| `G2_SUMMARIZE_API_URL` | *(empty)* | OpenAI-compatible chat completion URL for summarization (e.g., `http://10.2.0.12:4000/v1/chat/completions`). Required when `G2_RESPONSE_MODE=summarize`. |
 | `G2_SUMMARIZE_MODEL` | *(empty)* | Model name for the summarization LLM (e.g., `gemma-3-4b`). Required when `G2_RESPONSE_MODE=summarize`. |
 | `G2_SUMMARIZE_API_KEY` | *(empty)* | API key for the summarization endpoint. Optional — local LiteLLM proxies may not require authentication. |
-| `G2_SUMMARY_MAX_CHARS` | `300` | Target maximum length for the LLM-generated summary (in characters). Used as `max_tokens` in the summarization request. |
+| `G2_MAX_SUMMARY_CHARS` | `300` | Target maximum length for the LLM-generated summary (in characters). Used as `max_tokens` in the summarization request. |
 | `G2_MAX_SESSIONS` | `100` | Max sessions before auto-eviction of oldest (LRU). Set to `0` for unlimited. |
 | `G2_MAX_AUDIO_BYTES` | `5242880` (5 MB) | Maximum audio file size accepted by the audio endpoint. Larger files return 413. |
 | `G2_MAX_CONTEXT_MESSAGES` | `50` | Maximum number of prior messages sent to the agent as conversation context. Prevents token overflow. |
@@ -426,10 +426,10 @@ To enable LLM-based summarization:
 1. Set `G2_RESPONSE_MODE=summarize`
 2. Configure the summarization endpoint:
    ```bash
-   G2_SUMMARIZE_ENDPOINT=http://10.2.0.12:4000/v1/chat/completions
+   G2_SUMMARIZE_API_URL=http://10.2.0.12:4000/v1/chat/completions
    G2_SUMMARIZE_MODEL=gemma-3-4b
-   G2_SUMMARIZE_API_KEY=optional-key    # often not needed for local LiteLLM
-   G2_SUMMARY_MAX_CHARS=300              # target summary length
+   G2_SUMMARIZE_API_KEY=***    # often not needed for local LiteLLM
+   G2_MAX_SUMMARY_CHARS=300              # target summary length
    ```
 3. The endpoint must be OpenAI Chat Completions compatible — a [LiteLLM proxy](https://github.com/BerriAI/litellm) works well with any local model.
 
