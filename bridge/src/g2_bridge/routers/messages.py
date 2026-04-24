@@ -21,6 +21,7 @@ from g2_bridge.database import Database
 from g2_bridge.lock import SessionLock
 from g2_bridge.models import AgentResponse, SendMessageRequest
 from g2_bridge.response_adapter import adapt_response
+from g2_bridge.summarize import generate_title
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,13 @@ async def send_message(
         user_msg_id = str(uuid.uuid4())
         await db.add_message(user_msg_id, session_id, "user", body.content, now)
         await db.update_session_timestamp(session_id, now)
+
+        # Auto-generate session title from first message (issue #76).
+        if not session["name"]:
+            title = await generate_title(body.content, settings)
+            if title:
+                await db.rename_session(session_id, title)
+                session["name"] = title
 
         # Load conversation history from DB (now includes this user message)
         stored_messages = await db.get_messages(session_id)
