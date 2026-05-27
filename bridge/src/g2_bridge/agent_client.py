@@ -58,7 +58,7 @@ class AgentClient:
         messages.append({"role": "user", "content": content})
 
         payload: dict[str, Any] = {
-            "model": "default",
+            "model": "gemini-3.5-flash",
             "messages": messages,
             "stream": False,
         }
