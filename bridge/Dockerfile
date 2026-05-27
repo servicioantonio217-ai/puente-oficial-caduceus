@@ -12,7 +12,7 @@ WORKDIR /app
 
 COPY --from=builder /install /usr/local
 
-RUN useradd --create-home --shell /bin/false appuser
+RUN mkdir -p /data && chmod 777 /data && useradd --create-home --shell /bin/false appuser
 
 USER appuser
 
