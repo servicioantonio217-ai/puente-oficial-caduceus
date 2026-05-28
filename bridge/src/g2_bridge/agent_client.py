@@ -58,7 +58,7 @@ class AgentClient:
         messages.append({"role": "user", "content": content})
 
         payload: dict[str, Any] = {
-            "model": "perplexity/llama-3-sonar-large-32k-online",
+            "model": "perplexity/sonar",
             "messages": messages,
             "stream": False,
         }
