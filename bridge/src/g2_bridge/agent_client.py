@@ -58,7 +58,7 @@ class AgentClient:
         messages.append({"role": "user", "content": content})
 
         payload: dict[str, Any] = {
-            "model": "llama3-70b-8192",
+            "model": "llama-3.3-70b-versatile",
             "messages": messages,
             "stream": False,
         }
